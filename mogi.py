@@ -11,7 +11,7 @@ TODO:
 -add sphinx docstrings
 """
 import numpy as np
-from . import util
+import util
 
 # =====================
 # Inverse Models
@@ -223,9 +223,9 @@ def calc_linmax_dPt(tn,dVdt,xcen=0,ycen=0,d=3e3,a=500.0,dP=100e6,mu=4e9,
     #tauB = ((3*K + 4*mu) / (3*K)) * tau
     tauA = ((3*K + mu) / (3*K)) * tau
 
-    C = (dVdt*tau) / (2*pi*d**2)
-    term1 = t/tau
-    term2 = (mu / (3*K)) * (1 - np.exp(-t/tauA))
+    C = (dVdt*tau) / (2*np.pi*d**2)
+    term1 = tn/tau
+    term2 = (mu / (3*K)) * (1 - np.exp(-tn/tauA))
     uzmax = C * (term1 - term2)
     return uzmax
 

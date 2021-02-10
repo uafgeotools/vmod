@@ -27,10 +27,13 @@ nu: poisson ratio [unitless]
 
 * tanslated from matlab code by Francois Beauducel
 #https://www.mathworks.com/matlabcentral/fileexchange/25982-okada--surface-deformation-due-to-a-finite-rectangular-source
+
+Author: Scott Henderson
 '''
 
 from __future__ import division
 import numpy as np
+import util
 
 eps = 1e-14 #numerical constant
 #tests for cos(dip) == 0 are made with "cos(dip) > eps"
