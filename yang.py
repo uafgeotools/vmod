@@ -25,7 +25,7 @@
 %       at x=0. We will assume (initially) that it is also centered at y=0.
 """
 import numpy as np
-from . import util
+import util
 
 
 # ================
