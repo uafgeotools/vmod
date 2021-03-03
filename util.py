@@ -7,7 +7,86 @@ Created on Tue Jun 21 14:59:15 2016
 """
 import numpy as np
 import rasterio
+import numpy.ma as ma
 
+def psi_phi(h):
+    t,w=gauleg(0,1,41)
+    g=-2.0*t/np.pi
+    d=np.concatenate((g,np.zeros(g.size)))
+    T1,T2,T3,T4=giveT(h,t,t)
+    T1p=np.zeros(T1.shape)
+    T2p=np.zeros(T1.shape)
+    T3p=np.zeros(T1.shape)
+    T4p=np.zeros(T1.shape)
+    N=t.size
+    for j in range(N):
+        T1p[:,j]=w[j]*T1[:,j]
+        T2p[:,j]=w[j]*T2[:,j]
+        T3p[:,j]=w[j]*T3[:,j]
+        T4p[:,j]=w[j]*T4[:,j]
+    M1=np.concatenate((T1p,T3p),axis=1)
+    M2=np.concatenate((T4p,T2p),axis=1)
+    Kp=np.concatenate((M1,M2),axis=0)
+    y=np.matmul(np.linalg.inv(np.eye(2*N,2*N)-(2/np.pi)*Kp),d)
+    phi=y[0:N]
+    psi=y[N:2*N]
+    return phi,psi,t,w
+
+def giveP(h,x):
+    P=np.zeros((4,x.size))
+    P[0]=(12*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),3)
+    P[1] = np.log(4*np.power(h,2)+np.power(x,2)) + (8*np.power(h,4)+2*np.power(x,2)*np.power(h,2)-np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),2)
+    P[2] = 2*(8*np.power(h,4)-2*np.power(x,2)*np.power(h,2)+np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),3)
+    P[3] = (4*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),2)
+    return P
+
+def giveT(h,t,r):
+    M = t.size
+    N = r.size
+    T1 = np.zeros((M,N)) 
+    T2 = np.zeros((M,N)) 
+    T3 = np.zeros((M,N))
+    for i in range(M):
+        Pm=giveP(h,t[i]-r)
+        Pp=giveP(h,t[i]+r)
+        T1[i] = 4*np.power(h,3)*(Pm[0,:]-Pp[0,:])
+        T2[i] = (h/(t[i]*r))*(Pm[1,:]-Pp[1,:]) +h*(Pm[2,:]+Pp[2,:])
+        T3[i] = (np.power(h,2)/r)*(Pm[3,:]-Pp[3,:]-2*r*((t[i]-r)*Pm[0,:]+(t[i]+r)*Pp[0,:]))
+    T4=np.copy(T3.T)
+    return T1,T2,T3,T4
+
+def legpol(x,N):
+    dim=x.size
+    if not dim==1:
+        dP=np.zeros((N,dim))
+        P=np.zeros((N+1,dim))
+        P[0]=np.ones(dim)
+    else:
+        dP=np.zeros(N)
+        P=np.zeros(N+1)
+        P[0]=1.0
+    P[1]=x
+    for j in range(1,N):
+        P[j+1] = ((2*j+1)*x*P[j] - j*P[j-1])/(j+1)
+        dP[j] = j*(x*P[j] - P[j-1])/(np.power(x,2)-1)
+    return P[N-1],dP[N-1]
+
+def gauleg(x1,x2,N):
+    eps=1e-8
+    z=np.zeros(N)
+    xm = 0.5*(x2+x1)
+    xl = 0.5*(x2-x1)
+    for n in range(N):
+        z[n] = np.cos(np.pi*((n+1)-0.25)/(N+0.5))
+        z1 = 100*z[n]
+        while np.abs(z1-z[n])>eps:
+            pN,dpN=legpol(z[n],N+1)
+            z1=z[n]
+            z[n]=z1-pN/dpN
+    pN,dpN=legpol(z,N+1)
+    x=xm-xl*z
+    w = 2*xl/((1-np.power(z,2))*np.power(dpN,2))
+    return x,w
 
 def world2rc(x,y,affine, inverse=False):
     '''
@@ -140,7 +219,7 @@ def get_enu2los(enuFile='enu.rdr.geo'):
     imageMath.py --eval='sin(rad(a_0))*cos(rad(a_1+90)); sin(rad(a_0)) * sin(rad(a_1+90)); cos(rad(a_0))' --a=los.rdr.geo -t FLOAT -s BIL -o enu.rdr.geo
     imageMath.py --eval='a_0*b_0;a_1*b_1;a_2*b_2' --a=enu.rdr.geo --b=model.geo -t FLOAT -o model_LOS.geo
     '''
-    data,junk,junk = util.load_rasterio(enuFile)
+    data,junk,junk = load_rasterio(enuFile)
     data[data==0] = np.nan
     e2los,n2los,u2los = data
     # NOTE: some sort of bug in conversion code why is there z=1 in z2los
