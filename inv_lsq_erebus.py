@@ -15,7 +15,7 @@ from source import Data, Source, Mogi, Yang
 ts_dir = "/gps/standard-solutions/erebus/erebus"
 #ts_dir = "/gps/standard-solutions/erebus/erebus_mogi_test"
 ts_dir = "/gps/standard-solutions/erebus/erebus_2021"
-ts_dir = "/gps/standard-solutions/erebus/erebus_yang_test"
+#ts_dir = "/gps/standard-solutions/erebus/erebus_yang_test"
 
 #erebus summit 77.53°S, 167.17°E https://volcano.si.edu/volcano.cfm?vn=390020
 erebus = utm.from_latlon(-77.53, 167.17)

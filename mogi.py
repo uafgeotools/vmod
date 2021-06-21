@@ -12,6 +12,7 @@ TODO:
 """
 import numpy as np
 import util
+import theano.tensor as tt
 
 # =====================
 # Inverse Models
@@ -125,12 +126,12 @@ def forward(x,y,xcen=0,ycen=0,d=3e3,dV=1e6, nu=0.25):
 
     # Convert to surface cylindrical coordinates
     th, rho = util.cart2pol(x,y) # surface angle and radial distance
-    R = np.hypot(d,rho) # radial distance from source
+    R = tt.sqrt(d**2+rho**2) # radial distance from source
 
     # Mogi displacement calculation
     C = ((1-nu) / np.pi) * dV
     ur = C * rho / R**3    # horizontal displacement, m
-    uz = C * d / R**3   # vertical displacement, m
+    uz = C * d / R**3      # vertical displacement, m
 
     ux, uy = util.pol2cart(th, ur)
     #return ux, uy, uz #returns tuple
