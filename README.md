@@ -1,2 +1,2 @@
-# goons_models
-Volcano geodetic models
+# V-MOD
+Volcano source model and inversion framework for geodesy
