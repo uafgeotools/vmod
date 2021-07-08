@@ -17,133 +17,28 @@ class Yang(Source):
     ##residual functin for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(x0=x[0], y0=x[1], z0=x[2], a=x[3], 
-                           A=x[4], P_G=x[5], theta=x[6], phi=x[7])
+                                  A=x[4], P_G=x[5], theta=x[6], phi=x[7])
 
         return np.concatenate((ux,uy,uz))-self.get_obs()
+
+    def print_model(self, x):
+        print("Yang:")
+        print("\tx = %f" % x[0])
+        print("\ty = %f" % x[1])
+        print("\td = %f" % x[2])
+        print("\ta = %f" % x[3])
+        print("\tA = %f" % x[4])
+        print("\tPG= %f" % x[5])
+        print("\ttheta = %f" % x[6])
+        print("\tphi = %f" % x[7])
+
+    def get_num_params(self):
+        return 8   
 
     # ================
     # Forward models
     # ================
-    def forward(self,x0,y0,z0,a,A,P_G,theta,phi,mu=26.6e9,nu=0.25):
-        #yang(-500,500,2000,a,b/a,dP/mu,mu,nu,45,90,[-2875.07722612, -2082.40080761,  -526.34373579], [ 606.48515842, -474.04624186,  929.50370699], [0, 0, 0])
-        # 3D Green's function for a spheroidal source 
-        # all parameters are in SI (MKS) units
-        #
-        # OUTPUT
-        # u         horizontal (East component) deformation
-        # v         horizontal (North component) deformation
-        # w         vertical (Up component) deformation
-        # dwdx      ground tilt (East component)
-        # dwdy      ground tilt (North component)
-        # eea       areal strain
-        # gamma1    shear strain
-        # gamma2    shear strain
-        #
-        # SOURCE PARAMETERS
-        # a         semimajor axis
-        # A         geometric aspect ratio [dimensionless]
-        # P_G       dimennsionless excess pressure (pressure/shear modulus) 
-        # x0,y0     surface coordinates of the center of the prolate spheroid
-        # z0        depth of the center of the sphere (positive downward and
-        #              defined as distance below the reference surface)
-        # theta     plunge (dip) angle [deg] [90 = vertical spheroid]
-        # phi       trend (strike) angle [deg] [0 = aligned to North]
-        #
-        # CRUST PARAMETERS
-        # mu        shear modulus
-        # nu        Poisson's ratio 
-        #
-        # BENCHMARKS (stored in object)
-        # x,y       benchmark location
-        # z         depth within the crust (z=0 is the free surface)
-        #
-        # Reference ***************************************************************
-        #
-        # Note ********************************************************************
-        #
-        # 2021-06-18 This is translated from Matlab code that has been around for a while ...
-        #
-        # BEFORE: compute the displacement due to a pressurized ellipsoid 
-        # using the finite prolate spheroid model by from Yang et al (JGR,1988)
-        # and corrections to the model by Newmann et al (JVGR, 2006).
-        # The equations by Yang et al (1988) and Newmann et al (2006) are valid for a
-        # vertical prolate spheroid only. There is and additional typo at pg 4251 in 
-        # Yang et al (1988), not reported in Newmann et al. (2006), that gives an error 
-        # when the spheroid is tilted (plunge different from 90�):
-        #           C0 = y0*cos(theta) + z0*sin(theta)
-        # The correct equation is 
-        #           C0 = z0/sin(theta)
-        # This error has been corrected in this script.
-        # *************************************************************************
 
-        # SINGULARITIES ***********************************************************
-        if theta >= 89.99:
-            theta = 89.99               # solution is singular when theta = 90deg
-        if A >= 0.99:
-            A = 0.99
-        # *************************************************************************
-
-        # DISPLACEMENT ************************************************************
-        # define parameters used to compute the displacement
-        b     = A*a;                    # semi-minor axis
-        lamb  = 2*mu*nu/(1-2*nu)        # first Lame's elatic modulus
-        P     = P_G*mu                  # excess pressure
-        theta = np.deg2rad(theta)       # dip angle in rad
-        phi   = np.deg2rad(phi)         # strike angle in rad
-
-        # compute 3D displacements
-        [u, v, w] = self._disp_(x0,y0,z0,a,b,lamb,mu,nu,P,theta,phi)
-        # *************************************************************************
-
-        return u, v, w
-
-        # TILT ********************************************************************
-#        h = 0.001*abs(max(x)-min(x));                                              % finite difference step
-#
-#        % East comonent
-#        [tmp1, tmp2, wp] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
-#        [tmp1, tmp2, wm] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
-#        dwdx = 0.5*(wp - wm)/h;
-#
-#        % North component
-#        [tmp1, tmp2, wp] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
-#        [tmp1, tmp2, wm] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
-#        dwdy = 0.5*(wp - wm)/h;
-#        % *************************************************************************
-#
-#
-#        % STRAIN ******************************************************************
-#        % Displacement gradient tensor
-#        [up , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
-#        [um , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
-#        dudx = 0.5*(up - um)/h;
-#
-#        [up , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
-#        [um , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
-#        dudy = 0.5*(up - um)/h;
-#
-#        [tmp1, vp , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
-#        [tmp1, vm , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
-#        dvdx = 0.5*(vp - vm)/h;
-#
-#        [tmp1, vp , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
-#        [tmp1, vm , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
-#        dvdy = 0.5*(vp - vm)/h;
-#
-#        % Strains
-#        eea = dudx + dvdy;                                                          % areal strain
-#        gamma1 = dudx - dvdy;                                                       % shear strain
-#        gamma2 = dudy + dvdx;                                                       % shear strain
-#        % *************************************************************************
-
-
-    def forward_mod(self):
-       return self.forward(x0=self.model.x[0], y0=self.model.x[1], z0=self.model.x[2], a=self.model.x[3], 
-                           A=self.model.x[4], P_G=self.model.x[5], theta=self.model.x[6], phi=self.model.x[7])
-
-    ########################
-    ### HELPER FUNCTIONS
-    ########################
     def _par_(self,a,b,lamb,mu,nu,P):
         # compute the parameters for the spheroid model
         # formulas from [1] Yang et al (JGR,1988)
@@ -378,5 +273,119 @@ class Yang(Source):
         
         return Ux, Uy, Uz
 
+    def forward(self,x0,y0,z0,a,A,P_G,theta,phi,mu=26.6e9,nu=0.25):
+        #yang(-500,500,2000,a,b/a,dP/mu,mu,nu,45,90,[-2875.07722612, -2082.40080761,  -526.34373579], [ 606.48515842, -474.04624186,  929.50370699], [0, 0, 0])
+        # 3D Green's function for a spheroidal source 
+        # all parameters are in SI (MKS) units
+        #
+        # OUTPUT
+        # u         horizontal (East component) deformation
+        # v         horizontal (North component) deformation
+        # w         vertical (Up component) deformation
+        # dwdx      ground tilt (East component)
+        # dwdy      ground tilt (North component)
+        # eea       areal strain
+        # gamma1    shear strain
+        # gamma2    shear strain
+        #
+        # SOURCE PARAMETERS
+        # a         semimajor axis
+        # A         geometric aspect ratio [dimensionless]
+        # P_G       dimennsionless excess pressure (pressure/shear modulus) 
+        # x0,y0     surface coordinates of the center of the prolate spheroid
+        # z0        depth of the center of the sphere (positive downward and
+        #              defined as distance below the reference surface)
+        # theta     plunge (dip) angle [deg] [90 = vertical spheroid]
+        # phi       trend (strike) angle [deg] [0 = aligned to North]
+        #
+        # CRUST PARAMETERS
+        # mu        shear modulus
+        # nu        Poisson's ratio 
+        #
+        # BENCHMARKS (stored in object)
+        # x,y       benchmark location
+        # z         depth within the crust (z=0 is the free surface)
+        #
+        # Reference ***************************************************************
+        #
+        # Note ********************************************************************
+        #
+        # 2021-06-18 This is translated from Matlab code that has been around for a while ...
+        #
+        # BEFORE: compute the displacement due to a pressurized ellipsoid 
+        # using the finite prolate spheroid model by from Yang et al (JGR,1988)
+        # and corrections to the model by Newmann et al (JVGR, 2006).
+        # The equations by Yang et al (1988) and Newmann et al (2006) are valid for a
+        # vertical prolate spheroid only. There is and additional typo at pg 4251 in 
+        # Yang et al (1988), not reported in Newmann et al. (2006), that gives an error 
+        # when the spheroid is tilted (plunge different from 90�):
+        #           C0 = y0*cos(theta) + z0*sin(theta)
+        # The correct equation is 
+        #           C0 = z0/sin(theta)
+        # This error has been corrected in this script.
+        # *************************************************************************
 
+        # SINGULARITIES ***********************************************************
+        if theta >= 89.99:
+            theta = 89.99               # solution is singular when theta = 90deg
+        if A >= 0.99:
+            A = 0.99
+        # *************************************************************************
+
+        # DISPLACEMENT ************************************************************
+        # define parameters used to compute the displacement
+        b     = A*a;                    # semi-minor axis
+        lamb  = 2*mu*nu/(1-2*nu)        # first Lame's elatic modulus
+        P     = P_G*mu                  # excess pressure
+        theta = np.deg2rad(theta)       # dip angle in rad
+        phi   = np.deg2rad(phi)         # strike angle in rad
+
+        # compute 3D displacements
+        [u, v, w] = self._disp_(x0,y0,z0,a,b,lamb,mu,nu,P,theta,phi)
+        # *************************************************************************
+
+        return u, v, w
+
+        # TILT ********************************************************************
+#        h = 0.001*abs(max(x)-min(x));                                              % finite difference step
+#
+#        % East comonent
+#        [tmp1, tmp2, wp] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
+#        [tmp1, tmp2, wm] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
+#        dwdx = 0.5*(wp - wm)/h;
+#
+#        % North component
+#        [tmp1, tmp2, wp] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
+#        [tmp1, tmp2, wm] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
+#        dwdy = 0.5*(wp - wm)/h;
+#        % *************************************************************************
+#
+#
+#        % STRAIN ******************************************************************
+#        % Displacement gradient tensor
+#        [up , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
+#        [um , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
+#        dudx = 0.5*(up - um)/h;
+#
+#        [up , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
+#        [um , tmp1, tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
+#        dudy = 0.5*(up - um)/h;
+#
+#        [tmp1, vp , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x+h,y,z);
+#        [tmp1, vm , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x-h,y,z);
+#        dvdx = 0.5*(vp - vm)/h;
+#
+#        [tmp1, vp , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y+h,z);
+#        [tmp1, vm , tmp2] = yangdisp(x0,y0,z0,a,b,lambda,mu,nu,P,theta,phi,x,y-h,z);
+#        dvdy = 0.5*(vp - vm)/h;
+#
+#        % Strains
+#        eea = dudx + dvdy;                                                          % areal strain
+#        gamma1 = dudx - dvdy;                                                       % shear strain
+#        gamma2 = dudy + dvdx;                                                       % shear strain
+#        % *************************************************************************
+
+    def forward_mod(self, x):
+       return self.forward(x0=x[0], y0=x[1], z0=x[2], a=x[3], 
+                           A=x[4], P_G=x[5], theta=x[6], phi=x[7])
 

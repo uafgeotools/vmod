@@ -1,12 +1,12 @@
 """
-Functions for forward volcano-geodesy analytic models
+Class to implement interface to geodetic data types used in source inversions
 
 Author: Ronni Grapenthin
 Date: 6/23/2021
 
 
 TODO:
-- think about how to integrate (In)SAR LOS
+- integrate (In)SAR LOS
 - integrate tilt
 """
 
@@ -27,6 +27,15 @@ class Data:
 
     def get_zs(self):
         return self.data['y'].to_numpy()*0.0
+
+    def get_site_ids(self):
+        return self.data['id'].to_numpy()
+
+    def get_lats(self):
+        return self.data['lat'].to_numpy()
+
+    def get_lons(self):
+        return self.data['lon'].to_numpy()
 
     def get_obs(self):
         ''' returns single vector with [ux1...uxN,uy1...uyN,uz1,...,uzN] as elements'''

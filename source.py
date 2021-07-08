@@ -1,15 +1,12 @@
 """
-Functions for forward volcano-geodesy analytic models
+Base class for analytical magmatic source models. Implements
+common functions required from all child classes.
 
-Author: Scott Henderson
-Date: 8/31/2012
-
+Author: Ronni Grapenthin, UAF
+Date: 6/23/2021
 
 
 TODO:
--benchmark codes against paper results
--test for georeferenced coordinate grids?
--add function to convert to los
 -add sphinx docstrings
 """
 import numpy as np
@@ -20,8 +17,17 @@ from data import Data
 
 class Source:
     def __init__(self, data):
-        self.data  = data
-        self.model = None
+        self.data        = data
+        self.x0          = None
+        self.low_bounds  = []
+        self.high_bounds = []
+
+    def set_x0(self, x0):
+        self.x0 = x0
+
+    def set_bounds(self, low_bounds, high_bounds):
+        self.low_bounds  = low_bounds
+        self.high_bounds = high_bounds
 
     def get_obs(self):
         return self.data.get_obs()
@@ -34,6 +40,15 @@ class Source:
 
     def get_zs(self):
         return self.data.get_zs()
+
+    def get_site_ids(self):
+        return self.data.get_site_ids()
+
+    def get_lats(self):
+        return self.data.get_lats()
+
+    def get_lons(self):
+       return self.data.get_lons()
 
     def res_norm(self):
         ux,uy,uz = self.forward_mod()
@@ -63,14 +78,14 @@ class Source:
                 dtype=[ ('lon', float), ('lat', float), ('east', float), ('north', float), 
                         ('esig', float), ('nsig', float), ('corr', float), ('id', 'U6')] )
 
-            dat['lon']   = self.data.data['lon'].to_numpy()
-            dat['lat']   = self.data.data['lat'].to_numpy()
+            dat['lon']   = self.get_lons()
+            dat['lat']   = self.get_lats()
             dat['east']  = ux*1000
             dat['north'] = uy*1000
             dat['esig']  = ux*0
             dat['nsig']  = ux*0
             dat['corr']  = ux*0
-            dat['id']    = self.data.data['id'].to_numpy()
+            dat['id']    = self.get_site_ids()
 
             print(dat)
 
@@ -82,36 +97,37 @@ class Source:
             dat['north'] = uz*1000
             np.savetxt(prefix+"_vert.gmt", dat, fmt='%s' )
 
-#    def make_map(self, region):
-#        import pygmt
-#
-#        fig = pygmt.Figure()
-#        df = self.data.data(['lon','lat','ux','uy','sx','sy','id'])
-#
-#        df = pd.DataFrame(
-#            data={
-#            "x": self.get_xs()
-#            "y": self.get_ys()
-#            "east_velocity": [0, 3, 4, 6, -6, 6],
-#            "north_velocity": [0, 3, 6, 4, 4, -4],
-#            "east_sigma": [4, 0, 4, 6, 6, 6],
-#            "north_sigma": [6, 0, 6, 4, 4, 4],
-#            "correlation_EN": [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-#            "SITE": ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-#        }
-#        )
-#        fig.velo(
-#            data=df,
-#            region=[-10, 8, -10, 6],
-#            pen="0.6p,red",
-#            uncertaintycolor="lightblue1",
-#            line=True,
-#            spec="e0.2/0.39/18",
-#            frame=["WSne", "2g2f"],
-#            projection="x0.8c",
-#            vector="0.3c+p1p+e+gred",
-#        )#
-#
-#        fig.show()        
+    def make_map(self, west, east, south, north, proj):
+        import pygmt
+
+        fig = pygmt.Figure()
+
+        if self.model is not None:
+            ux,uy,uz = self.forward_mod()
+            df_mod_hori = pd.DataFrame(
+                            data={
+                                "x": self.get_xs(),
+                                "y": self.get_ys(),
+                                "east_velocity":  ux,
+                                "north_velocity": uy,
+                                "east_sigma": ux*0,
+                                "north_sigma": uy*0,
+                                "correlation_EN": ux*0,
+                                "SITE": self.get_site_ids(),
+                                }
+                    )
+        fig.velo(
+            data=df_mod_hori,
+            region=[west, east, south, north],
+            pen="0.6p,red",
+            uncertaintycolor="lightblue1",
+            line=True,
+            spec="e0.2/0.39/18",
+            frame=["WSne", "2g2f"],
+            projection=proj, 
+            vector="0.3c+p1p+e+gred",
+        )
+
+        fig.show()        
    
 

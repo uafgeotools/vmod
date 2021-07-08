@@ -9,12 +9,17 @@ Date: 03/25/2021
 import numpy as np
 import utm
 
-from source import Data, Source, Mogi, Yang
+from source import Source
+from data import Data
+from inverse import Inverse
+from mogi import Mogi
+from yang import Yang
+
 
 #timeseries analysis directory
-ts_dir = "/gps/standard-solutions/erebus/erebus"
+ts_dir = "/gps/standard-solutions/erebus/2004_2011"
 #ts_dir = "/gps/standard-solutions/erebus/erebus_mogi_test"
-ts_dir = "/gps/standard-solutions/erebus/erebus_2021"
+#ts_dir = "/gps/standard-solutions/erebus/2020_2021"
 #ts_dir = "/gps/standard-solutions/erebus/erebus_yang_test"
 
 #erebus summit 77.53°S, 167.17°E https://volcano.si.edu/volcano.cfm?vn=390020
@@ -23,8 +28,9 @@ erebus = utm.from_latlon(-77.53, 167.17)
 print(erebus[0], erebus[1])
 
 #stations of interest
-#sites = ("ABBZ", "HOOZ", "CONG", "E1G2", "NAUS", "MACG")
-sites = ("PHIG", "CON2", "NAU2")
+sites = ("ABBZ", "HOOZ", "CONG", "E1G2", "NAUS", "MACG")
+#sites = ("CONG", "E1G2", "NAUS", "MACG")
+#sites = ("PHIG", "CON2", "NAU2", "HOG2")
 
 data = Data()
 
@@ -48,18 +54,21 @@ for s in sites:
 
 print(data.data)
 
-#mogi = Mogi(data)
-#x0   = np.array([-10000, -10000, 40000, 1e9])
-#mod  = mogi.invert(x0, ([-10000, -10000, 200, -1e9], [10000, 10000, 40000, 1e9]))
-#print("monopole:", mod.x)
-#print("residual norm: %f" %(mogi.res_norm()))
-#mogi.write_forward_gmt('erebus_mogi')
+inv = Inverse(data)
 
-#x0   = np.array([-10000, -10000, 1000, 1e9, -10000, -10000, 40000, 1e9])
-#mod  = mogi.invert_dipole(x0, ([-10000, -10000, 0, -1e9, -10000, -10000, 0, -1e9], [10000, 10000, 5000, 1e9, 10000, 10000, 40000, 1e9]))
-#print("dipole:", mod.x)
-#print("residual norm: %f" %(mogi.res_norm()))
-#mogi.write_forward_gmt('erebus_2mogi')
+mogi = Mogi(data)
+mogi.set_x0(np.array([-10000, -10000, 40000, 1e9]))
+mogi.set_bounds(low_bounds = [-10000, -10000, 200, -1e9], high_bounds = [10000, 10000, 40000, 1e9])
+
+mogi2 = Mogi(data)
+mogi2.set_x0(np.array([-10000, -10000, 40000, 1e9]))
+mogi2.set_bounds(low_bounds = [-10000, -10000, 200, -1e9], high_bounds = [10000, 10000, 40000, 1e9])
+
+inv.register_source(mogi)
+#inv.register_source(mogi2)
+inv.nlsq()
+
+inv.write_forward_gmt(ts_dir+'/erebus_mogi')
 
 yang = Yang(data)
 
@@ -70,19 +79,20 @@ mu=26.6E9
 nu=0.25
 delta_V = 1e6
 dP = ( (delta_V/V) * mu ) / ( ((b/a)**2)/3 - 0.7*(b/a) + 1.37 )
-ux,uy,uz = yang.forward(-500,500,2000,a,b/a,dP/mu,45,90,mu,nu)
-print(ux,uy,uz)
 
 #yang(-500,500,2000,a,b/a,dP/mu,mu,nu,45,90,[-2875.07722612, -2082.40080761,  -526.34373579], [ 606.48515842, -474.04624186,  929.50370699], [0, 0, 0])
 
-x0   = np.array([0, 0, 1000, a, b/a, dP/mu, 1, 1])
-print([-10000, -10000, 0, 0, 0, -1e9, 0, 0])
-print(x0)
-print([10000, 10000, 40000, 20000, 1, 1e9, 90, 360])
-mod  = yang.invert(x0, ([-10000, -10000, 0, 0, 0, -1e9, 0, 0], [10000, 10000, 40000, 20000, 1, 1e9, 90, 360]))
-print("Yang:",mod.x)
-print("residual norm: %f" %(yang.res_norm()))
-yang.write_forward_gmt('erebus_yang')
+yang.set_x0(np.array([0, 0, 1000, a, b/a, dP/mu, 1, 1]))
+yang.set_bounds(low_bounds  = [-10000, -10000, 0,     0,     0, -1e9,  0, 0], 
+                high_bounds = [ 10000,  10000, 40000, 20000, 1,  1e9, 90, 360])
+
+inv.register_source(yang)
+inv.nlsq()
+#inv.write_forward_gmt(ts_dir+'/erebus_mogi_yang')
+
+inv.print_model()
+#print("residual norm: %f" %(yang.res_norm()))
+#yang.write_forward_gmt(ts_dir+'/erebus_yang')
 
 
 

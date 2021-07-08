@@ -19,12 +19,23 @@ from source import Source
 
 class Mogi(Source):
 
+    def get_num_params(self):
+        return 4
+
+    def print_model(self, x):
+        print("Mogi:")
+        print("\tx = %f" % x[0])
+        print("\ty = %f" % x[1])
+        print("\td = %f" % x[2])
+        print("\tdV= %f" % x[3])
+
     ##residual function for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], dV=x[3])
         diff =np.concatenate((ux,uy,uz))-self.get_obs()
 #        print("Mogi res norm = %f" % np.linalg.norm(diff))
         return diff
+
 
     ##least_squares residaul function for dipole
     def fun_dipole(self, x):
@@ -36,12 +47,8 @@ class Mogi(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_mod(self):
-        if len(self.model.x) == 4:
-            return self.forward(self.model.x[0], self.model.x[1], self.model.x[2], self.model.x[3])
-        elif len(self.model.x) == 8:
-            return self.forward_dipole( self.model.x[0], self.model.x[1], self.model.x[2], self.model.x[3], 
-                                        self.model.x[4], self.model.x[5], self.model.x[6], self.model.x[7])
+    def forward_mod(self, x):
+        return self.forward(x[0], x[1], x[2], x[3])
 
     def forward(self, xcen, ycen, d, dV, nu=0.25):
        
@@ -87,14 +94,6 @@ class Mogi(Source):
         ux, uy = util.pol2cart(th, ur)
         #return ux, uy, uz #returns tuple
         return np.array([ux,uy,uz])
-
-    def forward_dipole(self, xcen1=0,ycen1=0,d1=3e3,dV1=10e6, xcen2=0,ycen2=0,d2=3e3,dV2=10e6, nu=0.25):
-        """
-        """
-        ux1, uy1, uz1 = self.forward(xcen1,ycen1,d1,dV1,nu)
-        ux2, uy2, uz2 = self.forward(xcen2,ycen2,d2,dV2,nu)
-
-        return np.array([ux1+ux2, uy1+uy2, uz1+uz2])
 
     def forward_dp(self, xcen=0,ycen=0,d=3e3,a=500,dP=100e6,mu=4e9,nu=0.25):
         """
