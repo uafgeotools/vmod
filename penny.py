@@ -111,4 +111,33 @@ class Penny(Source):
         dV= -4 * np.pi * (1 - nu) * P_G *a**3 * (t * (wt.T.dot(phi)))
         return dV
 
+    def verify():
+        from data import Data
+        import matplotlib.pyplot as plt        
+        
+        x0=0
+        y0=0
+        z0=1000
+        P_G=0.01
+        a=1000
+        x=np.arange(-5000,5001,100)
+        y=np.arange(-5000,5001,100)
+
+        d = Data()
+        d.add_locs(x,y)
+
+        penny = Penny(d)
+
+        u,v,w=penny.forward(x0,y0,z0,P_G,a)
+
+        plt.figure()
+        plt.plot(x,u,c='red',label='u')
+
+        plt.figure()
+        plt.plot(y,v,c='red',label='v')
+
+        plt.figure()
+        plt.plot(y,w,c='red',label='w')
+
+        plt.show()
 
