@@ -37,13 +37,6 @@ class Mogi(Source):
         return diff
 
 
-    ##least_squares residaul function for dipole
-    def fun_dipole(self, x):
-        ux, uy, uz = self.forward_dipole(xcen1=x[0], ycen1=x[1], d1=x[2], dV1=x[3], xcen2=x[4], ycen2=x[5], d2=x[6], dV2=x[7])
-        diff = np.concatenate((ux,uy,uz))-self.get_obs()
-#        print("Mogi res norm = %f" % np.linalg.norm(diff))
-        return diff
-
     # =====================
     # Forward Models
     # =====================
@@ -84,7 +77,7 @@ class Mogi(Source):
 
         # Convert to surface cylindrical coordinates
         th, rho = util.cart2pol(x,y) # surface angle and radial distance
-        R = np.sqrt(d**2+rho**2) # radial distance from source
+        R = np.sqrt(d**2+rho**2)     # radial distance from source
 
         # Mogi displacement calculation
         C = ((1-nu) / np.pi) * dV
@@ -92,6 +85,7 @@ class Mogi(Source):
         uz = C * d / R**3      # vertical displacement, m
 
         ux, uy = util.pol2cart(th, ur)
+
         #return ux, uy, uz #returns tuple
         return np.array([ux,uy,uz])
 

@@ -19,6 +19,10 @@ class Data:
     def add(self, id, lat, lon, height, x, y, ux, uy, uz, sx, sy, sz):
         self.data.loc[len(self.data.index)] = [id] + list((lat,lon,height,x,y,ux,uy,uz,sx,sy,sz))
 
+    def add_locs(self, x, y):
+        self.data['x'] = pd.Series(x)
+        self.data['y'] = pd.Series(y)
+
     def get_xs(self):
         return self.data['x'].to_numpy()
 

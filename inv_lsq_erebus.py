@@ -14,7 +14,8 @@ from data import Data
 from inverse import Inverse
 from mogi import Mogi
 from yang import Yang
-
+from visco_shell import ViscoShell
+from penny import Penny
 
 #timeseries analysis directory
 ts_dir = "/gps/standard-solutions/erebus/2004_2011"
@@ -64,12 +65,6 @@ mogi2 = Mogi(data)
 mogi2.set_x0(np.array([-10000, -10000, 40000, 1e9]))
 mogi2.set_bounds(low_bounds = [-10000, -10000, 200, -1e9], high_bounds = [10000, 10000, 40000, 1e9])
 
-inv.register_source(mogi)
-#inv.register_source(mogi2)
-inv.nlsq()
-
-inv.write_forward_gmt(ts_dir+'/erebus_mogi')
-
 yang = Yang(data)
 
 a = 100
@@ -80,16 +75,27 @@ nu=0.25
 delta_V = 1e6
 dP = ( (delta_V/V) * mu ) / ( ((b/a)**2)/3 - 0.7*(b/a) + 1.37 )
 
-#yang(-500,500,2000,a,b/a,dP/mu,mu,nu,45,90,[-2875.07722612, -2082.40080761,  -526.34373579], [ 606.48515842, -474.04624186,  929.50370699], [0, 0, 0])
-
 yang.set_x0(np.array([0, 0, 1000, a, b/a, dP/mu, 1, 1]))
 yang.set_bounds(low_bounds  = [-10000, -10000, 0,     0,     0, -1e9,  0, 0], 
                 high_bounds = [ 10000,  10000, 40000, 20000, 1,  1e9, 90, 360])
 
-inv.register_source(yang)
-inv.nlsq()
-#inv.write_forward_gmt(ts_dir+'/erebus_mogi_yang')
 
+vshell = ViscoShell(data)
+vshell.set_x0(np.array([2, 0, 0, 500, 200, 400, -100e5, 30e9, 2e16]))
+vshell.set_bounds(low_bounds = [0, -1000, -1000, 0, 0, 0, -100e9, 10e8, 2e15], high_bounds = [60*60*24*365*10, 1000, 1000, 40000, 5000, 10000, 100e9, 30e10, 2e18])
+
+penny = Penny(data)
+penny.set_x0(np.array([0, 0, 500, 0.01, 1000]))
+penny.set_bounds(low_bounds = [-10000, -10000, 0, -10, 0], high_bounds = [10000, 10000, 40000, 100, 10000])
+
+inv.register_source(yang)
+#inv.register_source(mogi)
+inv.register_source(penny)
+#inv.register_source(mogi)
+inv.nlsq()
+
+inv.write_forward_gmt(ts_dir+'/erebus_yang_penny')
+#inv.write_forward_gmt(ts_dir+'/erebus_penny')
 inv.print_model()
 #print("residual norm: %f" %(yang.res_norm()))
 #yang.write_forward_gmt(ts_dir+'/erebus_yang')
