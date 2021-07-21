@@ -16,9 +16,11 @@ class Data:
     def __init__(self):
         self.data = pd.DataFrame(columns=['id', 'lat', 'lon', 'height', 'x','y','ux','uy','uz','sx','sy','sz'])
 
+    #this is useful if you've got a few GNSS stations with offsets
     def add(self, id, lat, lon, height, x, y, ux, uy, uz, sx, sy, sz):
         self.data.loc[len(self.data.index)] = [id] + list((lat,lon,height,x,y,ux,uy,uz,sx,sy,sz))
 
+    #useful if all that's to be done is run a forward model
     def add_locs(self, x, y):
         self.data['x'] = pd.Series(x)
         self.data['y'] = pd.Series(y)

@@ -22,8 +22,11 @@ class Mogi(Source):
     def get_num_params(self):
         return 4
 
+    def get_source_id(self):
+        return "Mogi"
+
     def print_model(self, x):
-        print("Mogi:")
+        print("Mogi")
         print("\tx = %f" % x[0])
         print("\ty = %f" % x[1])
         print("\td = %f" % x[2])

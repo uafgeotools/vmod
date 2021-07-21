@@ -17,6 +17,9 @@ class Penny(Source):
     def get_num_params(self):
         return 5
 
+    def get_source_id(self):
+        return "Penny"
+
     def print_model(self, x):
         print("Penny-shaped Crack:")
         print("\tx  = %f (m)" % x[0])

@@ -89,7 +89,7 @@ class Inverse:
             param_cnt += s.get_num_params()
 
     ##writes gmt files for horizontal and vertical deformation, each, to use with gmt velo.
-    def write_forward_gmt(self, prefix):
+    def write_forward_gmt(self, prefix, volcano=None):
         if self.model is not None:
 
             ux,uy,uz = self.forward(self.model.x)
@@ -116,6 +116,33 @@ class Inverse:
             dat['east']  = ux*0
             dat['north'] = uz*1000
             np.savetxt(prefix+"_vert.gmt", dat, fmt='%s' )
+            
+            if volcano is not None:
+                import utm
+                dat = np.zeros(len(self.sources), dtype=[ ('lon', float), ('lat', float), ('id', 'U6')] )
+
+                print(len(self.sources))                    
+
+                param_cnt = 0
+                source_cnt = 0
+
+                for s in self.sources:
+                    e_loc = volcano[0] + self.model.x[param_cnt]
+                    n_loc = volcano[1] + self.model.x[param_cnt+1]
+
+                    param_cnt += s.get_num_params()
+
+                    loc_ll = utm.to_latlon(e_loc, n_loc, volcano[2], volcano[3])
+
+                    dat["lat"][source_cnt] = loc_ll[0]
+                    dat["lon"][source_cnt] = loc_ll[1]
+                    dat["id"][source_cnt]  = s.get_source_id()
+
+                    source_cnt += 1
+
+                print(dat)                    
+
+                np.savetxt(prefix+"_source_loc.gmt", dat, fmt='%s' )
         else:
             print("No model, nothing to write")
 

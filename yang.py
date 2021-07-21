@@ -35,6 +35,9 @@ class Yang(Source):
     def get_num_params(self):
         return 8   
 
+    def get_source_id(self):
+        return "Yang"
+
     # ================
     # Forward models
     # ================
