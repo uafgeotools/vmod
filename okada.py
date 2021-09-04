@@ -28,7 +28,7 @@ nu: poisson ratio [unitless]
 * tanslated from matlab code by Francois Beauducel
 #https://www.mathworks.com/matlabcentral/fileexchange/25982-okada--surface-deformation-due-to-a-finite-rectangular-source
 
-Author: Scott Henderson
+Authors: Scott Henderson, Mario Angarita, Ronni Grapenthin
 '''
 
 from __future__ import division
@@ -44,21 +44,31 @@ eps = 1e-14 #numerical constant
 class Okada(Source):
 
     def get_num_params(self):
-        return 4
+        return 9
 
     def get_source_id(self):
         return "Okada"
 
     def print_model(self, x):
         print("Okada")
-        print("\tx = %f" % x[0])
-        print("\ty = %f" % x[1])
-        print("\td = %f" % x[2])
-        print("\tdV= %f" % x[3])
+        print("\txcen = %f" % x[0])
+        print("\tycen = %f" % x[1])
+        print("\tdepth = %f" % x[2])
+        print("\tlength= %f" % x[3])
+        print("\twidth = %f" % x[4])
+        print("\tslip = %f" % x[5])
+        print("\topening = %f" % x[6])
+        print("\tstrike= %f" % x[7])
+        print("\tdip = %f" % x[8])
+        print("\trake = %f" % x[9])
+        
 
     ##residual function for least_squares
     def fun(self, x):
-        ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], dV=x[3])
+        ux, uy, uz = self.forward(xcen=x[0], ycen=x[1],
+                        depth=x[2], length=x[3], width=x[4],
+                        slip=x[5], opening=x[6],
+                        strike=x[7], dip=x[8], rake=x[9])
         diff =np.concatenate((ux,uy,uz))-self.get_obs()
         return diff
 
@@ -270,104 +280,99 @@ class Okada(Source):
             I = -(1 - 2 * nu) * xi * np.sin(dip) / (R + db)
         return I
 
-    def verify():
-        '''Test for self.forward to replicate Figure 28 of dModels report'''
+def verify(xi=4000,xf=25000,yi=4000,yf=20000,dip=60,U=1,zt=1000,zb=10000,typ='ss'):
+    '''Test for self.forward to replicate Figure 28 of dModels report'''
 
-        from data import Data
-        import matplotlib.pyplot as plt        
-        
-        xi=4000
-        xf=25000
-        yi=4000
-        yf=20000
-        zt=1000
-        zb=10000
-        dip=60
+    from data import Data
+    import matplotlib.pyplot as plt        
+    
+    if dip>=90:
+        dip=89.99
 
-        strike=np.degrees(np.arctan((xf-xi)/(yf-yi)))
+    ##################################################################
+    #Conversion between dmodels input and Python implementation input
+    ##################################################################
+    #Strike from boundaries of the fault
+    strike=np.degrees(np.arctan2((xf-xi),(yf-yi)))
 
-        length=np.sqrt(np.power(xf-xi,2)+np.power(yf-yi,2))
+    #Length from boundaries of the fault
+    length=np.sqrt(np.power(xf-xi,2)+np.power(yf-yi,2))
 
-        W=(zb-zt)/np.sin(np.radians(dip))
-        Wproj=W*np.cos(np.radians(dip))
+    #Width form boundaries of the fault
+    W=(zb-zt)/np.sin(np.radians(dip))
+    Wproj=W*np.cos(np.radians(dip))
+    
+    #Location for the center of the fault (xcen, ycen) from boundaries and dipping angle of fault
+    xceni=xi+(xf-xi)/2
+    yceni=yi+(yf-yi)/2
 
-        xceni=xi+(xf-xi)/2
-        yceni=yi+(yf-yi)/2
+    xcen=xceni+Wproj*np.cos(np.radians(strike))/2
+    ycen=yceni-Wproj*np.sin(np.radians(strike))/2
 
-        xcen=xceni+Wproj*np.cos(np.radians(strike))
-        ycen=yceni-Wproj*np.sin(np.radians(strike))
+    #Depth from boundaries in the z axis
+    depth=(zt+zb)/2
 
-        depth=(zt+zb)/2
+    #If strike slip rake=180
+    if typ=='ss':
+        slip=U
+        opening=0
+        rake=180
+    elif typ=='ds':
+        slip=U
+        opening=0
+        rake=90
+    elif typ=='ten':
+        opening=U
+        slip=0
+        rake=0
+    
+    ###################################################################
+    
+    x=np.linspace(-50000,50000,num=1000)
+    y=x
 
-        print(np.degrees(strike),xceni,yceni,xcen,ycen,length,W,depth)
-
-        x=np.linspace(-50000,50000,num=100)
-        y=x
-
-        mu=1e9
-        s=1
-
-        #create data structure
-        d = Data()
+    #create data structure
+    d = Data()
+    if typ=='ten':
+        d.add_locs(x,y)
+    else:
         d.add_locs(x,y*0)
 
-        #initialize source model
-        okada = Okada(d)
+    #initialize source model
+    okada = Okada(d)
 
-        #run forward model
-        ux,uy,uz=okada.forward(xcen=xcen, ycen=ycen,
-                    depth=depth, length=length, width=W,
-                    slip=s, opening=0.0,
-                    strike=strike, dip=dip, rake=180.0,
-                    nu=0.25)
+    #run forward model
+    ux,uy,uz=okada.forward(xcen=xcen, ycen=ycen,
+                depth=depth, length=length, width=W,
+                slip=slip, opening=opening,
+                strike=strike, dip=dip, rake=rake,
+                nu=0.25)
 
-# CANT DO THE BELOW WITHT HE CURRENT IMPLEMENTATION of DATA (1d only), raises the following error
-#   d.add_locs(X,Y)
-#  File "/home/roon/REPOSITORIES/vmod/data.py", line 25, in add_locs
-#    self.data['x'] = pd.Series(x)
-#  File "/home/roon/.conda/envs/mcmc/lib/python3.8/site-packages/pandas/core/series.py", line 364, in __init__
-#    data = sanitize_array(data, index, dtype, copy, raise_cast_failure=True)
-#  File "/home/roon/.conda/envs/mcmc/lib/python3.8/site-packages/pandas/core/construction.py", line 529, in sanitize_array
-#    raise ValueError("Data must be 1-dimensional")
-#
-#
-#        x1=np.linspace(-50000,50000,50)
-#        y1=x1
-#        X,Y=np.meshgrid(x1,y1)
-#
-#        #create new data structure
-#        d = Data()
-#        d.add_locs(X,Y)
-#
-#        #initialize new source model
-#        okada = Okada(d)
-        
-#        UX,UY,UZ=okada.forward(xcen=xcen, ycen=ycen,
-#                    depth=depth, length=length, width=W,
-#                    slip=s, opening=0.0,
-#                    strike=strike, dip=dip, rake=180.0,
-#                    nu=0.25)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3,figsize=(15,3))
+    
+    if typ=='ten':
+        #Diagonal profile
+        profile=(x-np.min(x))*np.sqrt(2)
+        profile-=np.mean(profile)
+    else:
+        #Horizontal profile
+        profile=x
+    ax1.plot(profile/1000,ux,c='green')
+    ax1.set_ylabel('U east (meters)')
+    ax1.set_xlim([-50,50])
+    #ax1.set_ylim([-0.1,0.04])
 
-#        plt.figure()
-#        plt.plot([xi,xf],[yi,yf],c='red',lw=2)
-#        plt.quiver(X,Y,UX,UY)
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
-        ax1.plot(x/1000,ux,'x',c='green')
-        ax1.set_ylabel('U east (meters)')
-        ax1.set_xlim([-50,50])
-        ax1.set_ylim([-0.08,0.01])
+    ax2.plot(profile/1000,uy,c='blue')
+    ax2.set_ylabel('V north (meters)')
+    ax2.set_xlabel('X in km')
+    ax2.set_xlim([-50,50])
+    #ax2.set_ylim([-0.25,0.1])
 
-        ax2.plot(y/1000,uy,c='blue')
-        ax2.set_ylabel('V north (meters)')
-        ax2.set_xlabel('X in km')
-        ax2.set_xlim([-50,50])
-        ax2.set_ylim([-0.10,0.04])
+    ax3.plot(profile/1000,uz,c='red')
+    ax3.set_ylabel('W up (meters)')
+    ax3.set_xlim([-50,50])
+    #ax3.set_ylim([-0.02,0.16])
 
-        ax3.plot(y/1000,uz,c='red')
-        ax3.set_ylabel('W up (meters)')
-        ax3.set_xlim([-50,50])
-        ax3.set_ylim([-0.02,0.16])
-
-        plt.show()
+    plt.show()
 
 
