@@ -27,7 +27,8 @@ class Penny(Source):
         print("\td  = %f (m)" % x[2])
         print("\tP_G= %f (m)" % x[3])
         print("\ta  = %f (m)" % x[4])
-
+    def get_parnames(self):
+        return "xcen","ycen","depth","pressure(shear)","radius"
     ##residual function for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
