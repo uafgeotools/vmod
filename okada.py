@@ -42,33 +42,56 @@ eps = 1e-14 #numerical constant
 #because cos(90*np.pi/180) is not zero but = 6.1232e-17 (!)
 
 class Okada(Source):
-
+    def set_type(self,typ):
+        self.type=typ
     def get_num_params(self):
-        return 9
+        if self.type=='open':
+            return 8
+        elif self.type=='slip':
+            return 9
 
     def get_source_id(self):
         return "Okada"
 
     def print_model(self, x):
         print("Okada")
-        print("\txcen = %f" % x[0])
-        print("\tycen = %f" % x[1])
-        print("\tdepth = %f" % x[2])
-        print("\tlength= %f" % x[3])
-        print("\twidth = %f" % x[4])
-        print("\tslip = %f" % x[5])
-        print("\topening = %f" % x[6])
-        print("\tstrike= %f" % x[7])
-        print("\tdip = %f" % x[8])
-        print("\trake = %f" % x[9])
+        if self.type=='slip':
+            print("\txcen = %f" % x[0])
+            print("\tycen = %f" % x[1])
+            print("\tdepth = %f" % x[2])
+            print("\tlength= %f" % x[3])
+            print("\twidth = %f" % x[4])
+            print("\tslip = %f" % x[5])
+            print("\tstrike= %f" % x[6])
+            print("\tdip = %f" % x[7])
+            print("\trake = %f" % x[8])
+        elif self.type=='open':
+            print("\txcen = %f" % x[0])
+            print("\tycen = %f" % x[1])
+            print("\tdepth = %f" % x[2])
+            print("\tlength= %f" % x[3])
+            print("\twidth = %f" % x[4])
+            print("\topening = %f" % x[5])
+            print("\tstrike= %f" % x[6])
+            print("\tdip = %f" % x[7])
         
-
+    def get_parnames(self):
+        if self.type=='slip':
+            return "xcen","ycen","depth","length","width","slip","strike","dip","rake"
+        elif self.type=='open':
+            return "xcen","ycen","depth","length","width","opening","strike","dip"
     ##residual function for least_squares
     def fun(self, x):
-        ux, uy, uz = self.forward(xcen=x[0], ycen=x[1],
-                        depth=x[2], length=x[3], width=x[4],
-                        slip=x[5], opening=x[6],
-                        strike=x[7], dip=x[8], rake=x[9])
+        if self.type=='open':
+            ux, uy, uz = self.forward(xcen=x[0], ycen=x[1],
+                                depth=x[2], length=x[3], width=x[4],
+                                slip=0.0, opening=x[5],
+                                strike=x[6], dip=x[7], rake=0.0)
+        elif self.type=='slip':
+            ux, uy, uz = self.forward(xcen=x[0], ycen=x[1],
+                                depth=x[2], length=x[3], width=x[4],
+                                slip=x[5], opening=0.0,
+                                strike=x[6], dip=x[7], rake=x[8])
         diff =np.concatenate((ux,uy,uz))-self.get_obs()
         return diff
 
@@ -76,8 +99,10 @@ class Okada(Source):
     # Forward Models
     # =====================
     def forward_mod(self, x):
-        return self.forward(x[0], x[1], x[2], x[3])
-
+        if self.type=='slip':
+            return self.forward(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
+        elif self.type=='open':
+            return self.forward(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
     def forward(self, xcen=0, ycen=0,
                         depth=5e3, length=1e3, width=1e3,
                         slip=0.0, opening=10.0,
@@ -86,6 +111,7 @@ class Okada(Source):
         '''
         Calculate surface displacements for Okada85 dislocation model
         '''
+        #print(xcen, ycen,depth, length, width,slip, opening,strike, dip, rake)
         e = self.get_xs() - xcen
         n = self.get_ys() - ycen
 
@@ -97,11 +123,22 @@ class Okada(Source):
 
         # Don't allow faults that prech the surface
         d_crit = width/2 * np.sin(np.deg2rad(dip))
-        assert depth >= d_crit, 'depth must be greater than {}'.format(d_crit)
-        assert length >=0, 'fault length must be positive'
-        assert width >=0, 'fault length must be positive'
-        assert rake <= 180, 'rake should be:  rake <= 180'
-        assert -1.0 <= nu <= 0.5, 'Poisson ratio should be: -1 <= nu <= 0.5'
+        nans=np.array([e*np.nan,e*np.nan,e*np.nan])
+        if depth<d_crit:
+            return nans
+        elif length<0:
+            return nans
+        elif width<0:
+            return nans
+        elif rake>180:
+            return nans
+        elif not -1.0 <= nu <= 0.5:
+            return nans
+        #assert depth >= d_crit, 'depth must be greater than {}'.format(d_crit)
+        #assert length >=0, 'fault length must be positive'
+        #assert width >=0, 'fault length must be positive'
+        #assert rake <= 180, 'rake should be:  rake <= 180'
+        #assert -1.0 <= nu <= 0.5, 'Poisson ratio should be: -1 <= nu <= 0.5'
 
         strike = np.deg2rad(strike) #transformations accounted for below
         dip    = np.deg2rad(dip)
