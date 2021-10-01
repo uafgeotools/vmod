@@ -11,6 +11,7 @@ TODO:
 """
 
 import pandas as pd
+import numpy as np
 
 class Data:
     def __init__(self):
@@ -24,7 +25,25 @@ class Data:
     def add_locs(self, x, y):
         self.data['x'] = pd.Series(x)
         self.data['y'] = pd.Series(y)
-
+        
+    def add_disp(self,ux,uy,uz):
+        self.data['ux'] = pd.Series(ux)
+        self.data['uy'] = pd.Series(uy)
+        self.data['uz'] = pd.Series(uz)
+    
+    def set_refidx(self,idx):
+        self.refidx=idx
+        
+    def get_refidx(self):
+        return self.refidx
+    
+    def get_reduced_obs(self):
+        rux=self.data['ux']-self.data['ux'][self.refidx]
+        ruy=self.data['uy']-self.data['uy'][self.refidx]
+        ruz=self.data['uz']-self.data['uz'][self.refidx]
+      
+        return np.concatenate((rux,ruy,ruz)).ravel()
+        
     def get_xs(self):
         return self.data['x'].to_numpy()
 
