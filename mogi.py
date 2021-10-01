@@ -1,8 +1,8 @@
 """
 Functions for forward volcano-geodesy analytic models
 
-Author: Scott Henderson
-Date: 8/31/2012
+Author: Scott Henderson, Mario Angarita, Ronni Grapenthin
+Date: 9/30/2021
 
 Turned in object oriented code 22-jun-2021, Ronni Grapenthin
 
@@ -31,7 +31,8 @@ class Mogi(Source):
         print("\ty = %f" % x[1])
         print("\td = %f" % x[2])
         print("\tdV= %f" % x[3])
-
+    def get_parnames(self):
+        return "xcen","ycen","depth","dV"
     ##residual function for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], dV=x[3])
@@ -88,9 +89,9 @@ class Mogi(Source):
         uz = C * d / R**3      # vertical displacement, m
 
         ux, uy = util.pol2cart(th, ur)
-
-        #return ux, uy, uz #returns tuple
-        return np.array([ux,uy,uz])
+        
+        return ux, uy, uz #returns tuple
+        #return np.array([ux,uy,uz])
 
     def forward_dp(self, xcen=0,ycen=0,d=3e3,a=500,dP=100e6,mu=4e9,nu=0.25):
         """
