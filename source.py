@@ -48,8 +48,41 @@ class Source:
         return self.data.get_lats()
 
     def get_lons(self):
-       return self.data.get_lons()
-
+        return self.data.get_lons()
+    
+    def get_orders(self):
+        orders=[]
+        for i in range(len(self.low_bounds)):
+            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
+            orders.append(10**order)
+        orders=np.array(orders)
+        return orders
+    
+    def get_model(self,x0):
+        pars=np.copy(x0)
+        for i in range(len(pars)):
+            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
+            pars[i]=pars[i]*10**order
+        ux,uy,uz = self.forward_mod(pars)
+        return np.concatenate((ux,uy,uz)).ravel()
+    
+    def get_model_reduced(self,x0):
+        pars=np.copy(x0)
+        for i in range(len(pars)):
+            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
+            pars[i]=pars[i]*10**order
+        ux,uy,uz = self.forward_mod(pars)
+        ux-=ux[self.data.refidx]
+        uy-=uy[self.data.refidx]
+        uz-=uz[self.data.refidx]
+        return np.concatenate((ux,uy,uz)).ravel()
+    
+    def get_residual(self,x0):
+        ux,uy,uz = self.forward_mod(x0)
+        #print(np.concatenate((ux,uy,uz)).ravel())
+        #print(self.data)
+        return self.data-np.concatenate((ux,uy,uz)).ravel()
+    
     def res_norm(self):
         ux,uy,uz = self.forward_mod()
         return np.linalg.norm(self.get_obs()*1000-np.concatenate([ux, uy, uz])*1000)
