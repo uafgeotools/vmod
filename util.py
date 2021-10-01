@@ -7,9 +7,12 @@ Created on Tue Jun 21 14:59:15 2016
 """
 import numpy as np
 import numpy.ma as ma
+import time
+import math
 
 def psi_phi(h):
     t,w=gauleg(0,1,41)
+    t=np.array(t)
     g=-2.0*t/np.pi
     d=np.concatenate((g,np.zeros(g.size)))
     T1,T2,T3,T4=giveT(h,t,t)
@@ -70,22 +73,66 @@ def legpol(x,N):
         dP[j] = j*(x*P[j] - P[j-1])/(np.power(x,2)-1)
     return P[N-1],dP[N-1]
 
-def gauleg(x1,x2,N):
-    eps=1e-8
-    z=np.zeros(N)
-    xm = 0.5*(x2+x1)
-    xl = 0.5*(x2-x1)
-    for n in range(N):
-        z[n] = np.cos(np.pi*((n+1)-0.25)/(N+0.5))
-        z1 = 100*z[n]
-        while np.abs(z1-z[n])>eps:
-            pN,dpN=legpol(z[n],N+1)
-            z1=z[n]
-            z[n]=z1-pN/dpN
-    pN,dpN=legpol(z,N+1)
-    x=xm-xl*z
-    w = 2*xl/((1-np.power(z,2))*np.power(dpN,2))
-    return x,w
+def legendre(n,x):
+    if n==0:
+        val2 = 1.
+        dval2 = 0.
+    elif n==1:
+        val2 = x
+        dval2 = 1.
+    else:
+        val0 = 1.; val1 = x
+        for j in range(1,n):
+            val2 = ((2*j+1)*x*val1 - j*val0)/(j+1)
+            val0, val1 = val1, val2
+        dval2 = n*(val0-x*val1)/(1.-x**2)
+    return val2, dval2
+
+def legnewton(n,xold,kmax=200,tol=1.e-8):
+    for k in range(1,kmax):
+        val, dval = legendre(n,xold)
+        xnew = xold - val/dval
+
+        xdiff = xnew - xold
+        if abs(xdiff/xnew) < tol:
+            break
+
+        xold = xnew
+    else:
+        xnew = None
+    return xnew
+
+def legroots(n):
+    roots = np.zeros(n)
+    npos = n//2
+    for i in range(npos):
+        xold = np.cos(np.pi*(4*i+3)/(4*n+2))
+        root = legnewton(n,xold) 
+        roots[i] = -root
+        roots[-1-i] = root
+    return roots
+
+def gauleg_params(n):
+    xs = legroots(n)
+    cs = 2/((1-xs**2)*legendre(n,xs)[1]**2)
+    return xs, cs
+
+def gauleg(a,b,n):
+    xs, cs = gauleg_params(n)
+    coeffp = 0.5*(b+a) 
+    coeffm = 0.5*(b-a)
+    ts = coeffp - coeffm*xs
+    ws=cs*coeffm
+    #contribs = cs*f(ts)
+    #return coeffm*np.sum(contribs)
+    return ts[::-1],ws
+
+def gauleg_params1(n):
+    xs,cs=np.polynomial.legendre.leggauss(n)
+    return xs,cs
+
+def f(x):
+    return 1/np.sqrt(x**2 + 1)
 
 def world2rc(x,y,affine, inverse=False):
     '''
