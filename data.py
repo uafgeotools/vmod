@@ -12,9 +12,12 @@ TODO:
 
 import pandas as pd
 import numpy as np
+#from pyproj import CRS
+#from pyproj import Transformer
 
 class Data:
     def __init__(self):
+        self.refidx=None
         self.data = pd.DataFrame(columns=['id', 'lat', 'lon', 'height', 'x','y','ux','uy','uz','sx','sy','sz'])
 
     #this is useful if you've got a few GNSS stations with offsets
@@ -38,11 +41,11 @@ class Data:
         return self.refidx
     
     def get_reduced_obs(self):
-        rux=self.data['ux']-self.data['ux'][self.refidx]
-        ruy=self.data['uy']-self.data['uy'][self.refidx]
-        ruz=self.data['uz']-self.data['uz'][self.refidx]
+        rux=np.copy(self.data['ux'])-self.data['ux'][self.refidx]
+        ruy=np.copy(self.data['uy'])-self.data['uy'][self.refidx]
+        ruz=np.copy(self.data['uz'])-self.data['uz'][self.refidx]
       
-        return np.concatenate((rux,ruy,ruz)).ravel()
+        return rux,ruy,ruz
         
     def get_xs(self):
         return self.data['x'].to_numpy()
@@ -64,8 +67,30 @@ class Data:
 
     def get_obs(self):
         ''' returns single vector with [ux1...uxN,uy1...uyN,uz1,...,uzN] as elements'''
-        return self.data[['ux','uy','uz']].to_numpy().flatten(order='F')
-
+        if not self.refidx==None:
+            print('Reduced')
+            rux=np.copy(self.data['ux'])-self.data['ux'][self.refidx]
+            ruy=np.copy(self.data['uy'])-self.data['uy'][self.refidx]
+            ruz=np.copy(self.data['uz'])-self.data['uz'][self.refidx]
+            return np.concatenate((rux,ruy,ruz)).ravel()
+        else:
+            print('Not reduced')
+            return self.data[['ux','uy','uz']].to_numpy().flatten(order='F')
+'''
+    def set_projection(self):
+        lons=self.get_lons()
+        lats=self.get_lats()
+        xs=[]
+        ys=[]
+        crs = CRS.from_epsg(4326)
+        crs1 = CRS.from_proj4("+proj=lcca +lat_0="+str(int(np.mean(lats)))+" +lon_0="+str(int(np.mean(lons))))
+        transformer = Transformer.from_crs(crs, crs1, always_xy=True)
+        for i in range(len(lons)):
+            x,y=transformer.transform(lons[i],lats[i])
+            xs.append(x)
+            ys.append(y)
+        self.add_locs(xs,ys)
+'''
 #class GNSS(Data):
 
 #class LOS(Data):
