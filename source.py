@@ -64,17 +64,10 @@ class Source:
             order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
             pars[i]=pars[i]*10**order
         ux,uy,uz = self.forward_mod(pars)
-        return np.concatenate((ux,uy,uz)).ravel()
-    
-    def get_model_reduced(self,x0):
-        pars=np.copy(x0)
-        for i in range(len(pars)):
-            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
-            pars[i]=pars[i]*10**order
-        ux,uy,uz = self.forward_mod(pars)
-        ux-=ux[self.data.refidx]
-        uy-=uy[self.data.refidx]
-        uz-=uz[self.data.refidx]
+        if not self.data.refidx==None:
+            ux-=ux[self.data.refidx]
+            uy-=uy[self.data.refidx]
+            uz-=uz[self.data.refidx]
         return np.concatenate((ux,uy,uz)).ravel()
     
     def get_residual(self,x0):
