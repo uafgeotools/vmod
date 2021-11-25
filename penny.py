@@ -28,7 +28,8 @@ class Penny(Source):
         print("\tP_G= %f (m)" % x[3])
         print("\ta  = %f (m)" % x[4])
     def get_parnames(self):
-        return "xcen","ycen","depth","pressure(shear)","radius"
+        #return "xcen","ycen","depth","pressure(shear)","radius"
+        return "xcen","ycen","depth","pressure","radius"
     ##residual function for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
@@ -38,10 +39,28 @@ class Penny(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_mod(self, x):
-        return self.forward(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
+    def forward_gps(self, x):
+        return self.gps(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
 
-    def forward(self,xcen,ycen,d,P_G,a,nu=0.25):
+    def forward_tilt(self, x):
+        return self.tilt(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
+    
+    def gps(self,xcen,ycen,d,P_G,a):
+        x=self.get_xs()
+        y=self.get_ys()
+        return self.model(x,y,xcen,ycen,d,P_G,a)
+    
+    def tilt(self,xcen,ycen,d,P_G,a):
+        
+        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,d,P_G,a)[2]
+        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,d,P_G,a)[2]
+        
+        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
+        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
+        
+        return duzx,duzy
+    
+    def model(self,x,y,xcen,ycen,d,P_G,a,nu=0.25):
         """
         Calculates surface deformation based on point pressure source
         References: Fialko
@@ -68,8 +87,8 @@ class Penny(Source):
         rd=np.copy(a)
 
         # Center coordinate grid on point source, normalized by radius
-        x = (self.get_xs() - xcen) / rd
-        y = (self.get_ys() - ycen) / rd
+        x = (x - xcen) / rd
+        y = (y - ycen) / rd
         z = (0 - d)    / rd
 
         eps=1e-8
@@ -112,6 +131,7 @@ class Penny(Source):
     def dP2dV(self, P_G,z0,a,nu=0.25):
         h=z0 / a
         phi,psi,t,wt=util.psi_phi(h)
+        print(phi.shape,psi.shape,t.shape,wt.shape)
         dV= -4 * np.pi * (1 - nu) * P_G *a**3 * (t * (wt.T.dot(phi)))
         return dV
 
