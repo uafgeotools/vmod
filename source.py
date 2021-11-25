@@ -16,8 +16,9 @@ import copy
 from data import Data
 
 class Source:
-    def __init__(self, data):
+    def __init__(self, data, typ='elastic'):
         self.data        = data
+        self.type        = typ
         self.x0          = None
         self.low_bounds  = []
         self.high_bounds = []
@@ -38,6 +39,9 @@ class Source:
     def get_ys(self):
         return self.data.get_ys()
 
+    def get_ts(self):
+        return self.data.get_ts()
+    
     def get_zs(self):
         return self.data.get_zs()
 
@@ -58,22 +62,43 @@ class Source:
         orders=np.array(orders)
         return orders
     
-    def get_model(self,x0):
-        pars=np.copy(x0)
-        for i in range(len(pars)):
-            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
-            pars[i]=pars[i]*10**order
-        ux,uy,uz = self.forward_mod(pars)
+    def get_model_los(self,x0):
+        ux,uy,uz = self.forward_gps(x0)
+        los=ux*np.sin(self.data.data['lk'].to_numpy())*np.cos(self.data.data['az'].to_numpy())-uy*np.sin(self.data.data['lk'].to_numpy())*np.sin(self.data.data['az'].to_numpy())-uz*np.cos(self.data.data['lk'].to_numpy())
+        los=-los
+        return los
+        
+    def get_model_3d(self,x0):
+        ux,uy,uz = self.forward_gps(x0)
         if not self.data.refidx==None:
             ux-=ux[self.data.refidx]
             uy-=uy[self.data.refidx]
             uz-=uz[self.data.refidx]
         return np.concatenate((ux,uy,uz)).ravel()
     
+    def get_model_tilt(self,x0):
+        dux,duy = self.forward_tilt(x0)
+        return np.concatenate((dux,duy)).ravel()
+    
+    def get_model(self,x0):
+        pars=np.copy(x0)
+        parnames=self.get_parnames()
+        
+        for i in range(len(pars)):
+            order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
+            if parnames[i]=='pressure':
+                pars[i]=10**pars[i]
+            else:
+                pars[i]=pars[i]*10**order
+        if self.data.type=='gps':
+            return self.get_model_3d(pars)
+        elif self.data.type=='insar':
+            return self.get_model_los(pars)
+        elif self.data.type=='tilt':
+            return self.get_model_tilt(pars)*1e6
+    
     def get_residual(self,x0):
         ux,uy,uz = self.forward_mod(x0)
-        #print(np.concatenate((ux,uy,uz)).ravel())
-        #print(self.data)
         return self.data-np.concatenate((ux,uy,uz)).ravel()
     
     def res_norm(self):
