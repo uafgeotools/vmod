@@ -44,10 +44,28 @@ class Mogi(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_mod(self, x):
-        return self.forward(x[0], x[1], x[2], x[3])
-
-    def forward(self, xcen, ycen, d, dV, nu=0.25):
+    def forward_gps(self, x):
+        return self.gps(x[0], x[1], x[2], x[3])
+    
+    def forward_tilt(self, x):
+        return self.tilt(x[0], x[1], x[2], x[3])
+    
+    def gps(self,xcen,ycen,d,dV):
+        x=self.get_xs()
+        y=self.get_ys()
+        return self.model(x,y,xcen,ycen,d,dV)
+    
+    def tilt(self,xcen,ycen,d,dV):
+        
+        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,d,dV)[2]
+        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,d,dV)[2]
+        
+        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
+        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
+        
+        return duzx,duzy
+    
+    def model(self,x,y, xcen, ycen, d, dV, nu=0.25):
        
         """
         Calculates surface deformation based on point pressure source
@@ -76,8 +94,8 @@ class Mogi(Source):
 
         """
         # Center coordinate grid on point source
-        x = self.get_xs() - xcen
-        y = self.get_ys() - ycen
+        x = x - xcen
+        y = y - ycen
 
         # Convert to surface cylindrical coordinates
         th, rho = util.cart2pol(x,y) # surface angle and radial distance
