@@ -29,6 +29,7 @@ Authors: Scott Henderson, Mario Angarita, Ronni Grapenthin
 from __future__ import division
 import numpy as np
 import util
+import scipy
 from source import Source
 
 class Yang(Source):
@@ -63,13 +64,28 @@ class Yang(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_mod(self, x):
-        if len(x)==9:
-            return self.forward(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7],x[8])
-        elif len(x)==8:
-            return self.forward(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7],9.6e9)
+    def forward_gps(self, x):
+        return self.gps(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7])
     
-    def forward(self,xcen=0,ycen=0,z0=5e3,P=10,a=2,b=1,phi=0,theta=0,mu=1.0,nu=0.25):
+    def forward_tilt(self, x):
+        return self.tilt(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7])
+        
+    def gps(self,xcen,ycen,z0,P,a,b,phi,theta):
+        x=self.get_xs()
+        y=self.get_ys()
+        return self.model(x,y,xcen,ycen,z0,P,a,b,phi,theta)
+    
+    def tilt(self,xcen,ycen,z0,P,a,b,phi,theta):
+        
+        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,z0,P,a,b,phi,theta)[2]
+        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,z0,P,a,b,phi,theta)[2]
+        
+        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
+        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
+        
+        return duzx,duzy
+    
+    def model(self,x,y,xcen=0,ycen=0,z0=5e3,P=10,a=2,b=1,phi=0,theta=0,mu=1.0,nu=0.25):
         '''
         Ellipsoidal pressurized chamber in elastic half-space
         Yang et al., vol 93, JGR, 4249-4257, 1988)     
@@ -103,9 +119,6 @@ class Yang(Source):
             print('Error: ({0}, {1}) lies outside grid Easting[{2:g}, {3:g}] Northing[{4:g}, {5:g}]'.format(xcen,ycen,minx,maxx,miny,maxy))
             return    
         '''
-        x = self.get_xs()
-        y = self.get_ys()
-        
 
         tp = 0 #topography vector?
         phi = np.deg2rad(phi) 
@@ -154,7 +167,6 @@ class Yang(Source):
         U3 = Up3 - Um3
 
         return U1,U2,U3
-
 
     def spheroid(a,b,c,matrl,phi,theta,P):
         ''' 
