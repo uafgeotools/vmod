@@ -35,7 +35,7 @@ from __future__ import division
 import numpy as np
 import util
 from source import Source
-
+import time
 
 eps = 1e-14 #numerical constant
 #tests for cos(dip) == 0 are made with "cos(dip) > eps"
@@ -98,12 +98,34 @@ class Okada(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_mod(self, x):
+    def forward_gps(self, x):
         if self.type=='slip':
-            return self.forward(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
+            return self.gps(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
         elif self.type=='open':
-            return self.forward(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
-    def forward(self, xcen=0, ycen=0,
+            return self.gps(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
+    
+    def forward_tilt(self, x):
+        if self.type=='slip':
+            return self.tilt(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
+        elif self.type=='open':
+            return self.tilt(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
+        
+    def gps(self,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake):
+        x=self.get_xs()
+        y=self.get_ys()
+        return self.model(x,y,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)
+    
+    def tilt(self,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake):
+        
+        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)[2]
+        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)[2]
+        
+        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
+        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
+        
+        return duzx,duzy
+    
+    def model(self,x,y, xcen=0, ycen=0,
                         depth=5e3, length=1e3, width=1e3,
                         slip=0.0, opening=10.0,
                         strike=0.0, dip=0.0, rake=0.0,
@@ -112,8 +134,8 @@ class Okada(Source):
         Calculate surface displacements for Okada85 dislocation model
         '''
         #print(xcen, ycen,depth, length, width,slip, opening,strike, dip, rake)
-        e = self.get_xs() - xcen
-        n = self.get_ys() - ycen
+        e = x - xcen
+        n = y - ycen
 
         # A few basic parameter checks
         if not (0.0 <= strike <= 360.0) or not (0 <= dip <= 90):
@@ -123,7 +145,7 @@ class Okada(Source):
 
         # Don't allow faults that prech the surface
         d_crit = width/2 * np.sin(np.deg2rad(dip))
-        nans=np.array([e*np.nan,e*np.nan,e*np.nan])
+        nans=np.array([e*np.inf,e*np.inf,e*np.inf])
         if depth<d_crit:
             return nans
         elif length<0:
@@ -134,6 +156,7 @@ class Okada(Source):
             return nans
         elif not -1.0 <= nu <= 0.5:
             return nans
+        
         #assert depth >= d_crit, 'depth must be greater than {}'.format(d_crit)
         #assert length >=0, 'fault length must be positive'
         #assert width >=0, 'fault length must be positive'
@@ -379,11 +402,14 @@ def verify(xi=4000,xf=25000,yi=4000,yf=20000,dip=60,U=1,zt=1000,zb=10000,typ='ss
     okada = Okada(d)
 
     #run forward model
+    inicio=time.time()
     ux,uy,uz=okada.forward(xcen=xcen, ycen=ycen,
                 depth=depth, length=length, width=W,
                 slip=slip, opening=opening,
                 strike=strike, dip=dip, rake=rake,
                 nu=0.25)
+    fin=time.time()
+    print('Calculation time',fin-inicio)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3,figsize=(15,3))
     
