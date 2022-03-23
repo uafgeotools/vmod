@@ -98,32 +98,6 @@ class Okada(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_gps(self, x):
-        if self.type=='slip':
-            return self.gps(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
-        elif self.type=='open':
-            return self.gps(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
-    
-    def forward_tilt(self, x):
-        if self.type=='slip':
-            return self.tilt(x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
-        elif self.type=='open':
-            return self.tilt(x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
-        
-    def gps(self,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake):
-        x=self.get_xs()
-        y=self.get_ys()
-        return self.model(x,y,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)
-    
-    def tilt(self,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake):
-        
-        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)[2]
-        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,depth,length,width,slip,opening,strike,dip,rake)[2]
-        
-        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
     
     def model(self,x,y, xcen=0, ycen=0,
                         depth=5e3, length=1e3, width=1e3,
@@ -133,7 +107,7 @@ class Okada(Source):
         '''
         Calculate surface displacements for Okada85 dislocation model
         '''
-        #print(xcen, ycen,depth, length, width,slip, opening,strike, dip, rake)
+        print(xcen, ycen,depth, length, width,slip, opening,strike, dip, rake)
         e = x - xcen
         n = y - ycen
 
@@ -197,7 +171,7 @@ class Okada(Source):
         ue = np.sin(strike) * ux - np.cos(strike) * uy
         un = np.cos(strike) * ux + np.sin(strike) * uy
 
-        return np.array([ue,un,uz])
+        return ue,un,uz
 
     def chinnery(f, x, p, L, W, q, dip, nu):
         '''Chinnery's notation [equation (24) p. 1143]'''
@@ -373,26 +347,31 @@ def verify(xi=4000,xf=25000,yi=4000,yf=20000,dip=60,U=1,zt=1000,zb=10000,typ='ss
     depth=(zt+zb)/2
 
     #If strike slip rake=180
+    typin='slip'
+    
     if typ=='ss':
         slip=U
         opening=0
         rake=180
+        xin=[xcen,ycen,depth,length,W,slip,strike,dip,rake]
     elif typ=='ds':
         slip=U
         opening=0
         rake=90
+        xin=[xcen,ycen,depth,length,W,slip,strike,dip,rake]
     elif typ=='ten':
         opening=U
         slip=0
         rake=0
-    
+        xin=[xcen,ycen,depth,length,W,opening,strike,dip]
+        typin='open'
     ###################################################################
     
     x=np.linspace(-50000,50000,num=1000)
     y=x
 
     #create data structure
-    d = Data()
+    d = Data('gps')
     if typ=='ten':
         d.add_locs(x,y)
     else:
@@ -400,14 +379,15 @@ def verify(xi=4000,xf=25000,yi=4000,yf=20000,dip=60,U=1,zt=1000,zb=10000,typ='ss
 
     #initialize source model
     okada = Okada(d)
+    okada.set_type(typin)
 
     #run forward model
     inicio=time.time()
-    ux,uy,uz=okada.forward(xcen=xcen, ycen=ycen,
-                depth=depth, length=length, width=W,
-                slip=slip, opening=opening,
-                strike=strike, dip=dip, rake=rake,
-                nu=0.25)
+    if typ=='ten':
+        ux,uy,uz=okada.forward(x,y,xin)
+    else:
+        ux,uy,uz=okada.forward(x,y*0,xin)
+    
     fin=time.time()
     print('Calculation time',fin-inicio)
 
