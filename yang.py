@@ -52,9 +52,12 @@ class Yang(Source):
         print("\ttheta= %f" % x[7])
         print("\tmu = %f" % x[8])
         
-    def get_parnames(self):
-        return "xcen","ycen","depth","pressure","a","b","strike","dip"
-    
+    def get_parnames(self,units=False):
+        if units:
+            return "xcen(m)","ycen(m)","depth(m)","pressure(Pa)","a(m)","b(m)","strike(m)","dip(m)"
+        else:
+            return "xcen","ycen","depth","pressure","a","b","az","dip"
+        
     ##residual function for least_squares
     def fun(self, x):
         ux, uy, uz = self.forward(xcen=x[0],ycen=x[1],z0=x[2],P=x[3],a=x[4],b=x[5],phi=x[6],theta=x[7],mu=x[8])
@@ -64,26 +67,6 @@ class Yang(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_gps(self, x):
-        return self.gps(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7])
-    
-    def forward_tilt(self, x):
-        return self.tilt(x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7])
-        
-    def gps(self,xcen,ycen,z0,P,a,b,phi,theta):
-        x=self.get_xs()
-        y=self.get_ys()
-        return self.model(x,y,xcen,ycen,z0,P,a,b,phi,theta)
-    
-    def tilt(self,xcen,ycen,z0,P,a,b,phi,theta):
-        
-        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,z0,P,a,b,phi,theta)[2]
-        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,z0,P,a,b,phi,theta)[2]
-        
-        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
     
     def model(self,x,y,xcen=0,ycen=0,z0=5e3,P=10,a=2,b=1,phi=0,theta=0,mu=1.0,nu=0.25):
         '''
@@ -430,13 +413,13 @@ def verify(A=0.5,theta=30,phi=60):
     x = np.linspace(-10*z0, 10*(z0), 121)
     y = x
     
-    d = Data()
+    d = Data('gps')
     d.add_locs(x,y)
     
     yan=Yang(d)
     #r = np.sqrt(np.power(x,2), np.power(y,2))
     #print(xcen,ycen,z0,dP,a,b,phi,theta,mu,0.25)
-    ux,uy,uz=yan.forward(xcen=xcen,ycen=ycen,z0=z0,P=dP,a=a,b=b,phi=phi,theta=theta,mu=mu,nu=0.25)
+    ux,uy,uz=yan.model(x,y,xcen=xcen,ycen=ycen,z0=z0,P=dP,a=a,b=b,phi=phi,theta=theta,mu=mu,nu=0.25)
     #ux,uy,uz = yang.forward(x, y, a=a, b=b, z0=z0, theta=theta, mu=mu, P=dP)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3,figsize=(15,4))
@@ -480,14 +463,14 @@ def verify1(A=0.5,theta=30,phi=60):
     x=np.array([-10e3,-5e3,-5e3,0,0,5e3,5e3,10e3])
     y=np.array([0,-5e3,5e3,-10e3,10e3,-5e3,5e3,0])
     
-    d = Data()
+    d = Data('gps')
     d.add_locs(x,y)
     
     yan=Yang(d)
     #r = np.sqrt(np.power(x,2), np.power(y,2))
     #print(xcen,ycen,z0,dP,a,b,phi,theta,mu,0.25)
     inicio=time.time()
-    ux,uy,uz=yan.forward(xcen=xcen,ycen=ycen,z0=z0,P=dP,a=a,b=b,phi=phi,theta=theta,mu=mu,nu=0.25)
+    ux,uy,uz=yan.model(x,y,xcen=xcen,ycen=ycen,z0=z0,P=dP,a=a,b=b,phi=phi,theta=theta,mu=mu,nu=0.25)
     fin=time.time()
     print('Tiempo',fin-inicio)
     #ux,uy,uz = yang.forward(x, y, a=a, b=b, z0=z0, theta=theta, mu=mu, P=dP)
