@@ -13,6 +13,7 @@ import numpy as np
 import util
 import pandas as pd
 import copy
+import scipy
 from data import Data
 
 class Source:
@@ -29,30 +30,79 @@ class Source:
     def set_bounds(self, low_bounds, high_bounds):
         self.low_bounds  = low_bounds
         self.high_bounds = high_bounds
+        
+    def forward(self, xpos, ypos, x):
+        if self.get_source_id()=='Mogi':
+            return self.model(xpos,ypos,x[0], x[1], x[2], x[3])
+        elif self.get_source_id()=='Mctigue':
+            return self.model(xpos,ypos,x[0], x[1], x[2], x[3], x[4])
+        elif self.get_source_id()=='Okada':
+            if self.type=='slip':
+                return self.model(xpos,ypos,x[0], x[1], x[2], x[3], x[4], x[5], 0.0, x[6], x[7], x[8])
+            elif self.type=='open':
+                return self.model(xpos,ypos,x[0], x[1], x[2], x[3], x[4], 0.0, x[5], x[6], x[7], 0.0)
+        elif self.get_source_id()=='Penny':
+            return self.model(xpos,ypos,x[0], x[1], x[2], x[3], x[4])
+        elif self.get_source_id()=='Nishimura':
+            ist=np.sum(~np.isnan(self.data.data['t'].to_numpy()))
+            if ist>0:
+                return self.model_t(xpos,ypos,x[0],x[1],x[2],x[3],x[4],x[5],x[6])
+            else:
+                return self.model(xpos,ypos,x[0],x[1],x[2],x[3],x[4],x[5])
+        elif self.get_source_id()=='Yang':
+            return self.model(xpos,ypos,x[0], x[1], x[2], x[3],x[4], x[5], x[6], x[7])
+    
+    def forward_insar(self,x):
+        xpos=self.get_xs(dataset='insar')
+        ypos=self.get_ys(dataset='insar')
+        
+        ux,uy,uz=self.forward(xpos,ypos,x)
+        
+        data=self.data.get_data('insar')
+        
+        los=ux*np.sin(data['lk'].to_numpy())*np.cos(data['az'].to_numpy())-uy*np.sin(data['lk'].to_numpy())*np.sin(data['az'].to_numpy())- uz*np.cos(data['lk'].to_numpy())
+        los=-los
+        
+        return los
+    
+    def forward_gps(self,x):
+        xpos=self.get_xs(dataset='gps')
+        ypos=self.get_ys(dataset='gps')
+        
+        return self.forward(xpos,ypos,x)
+    
+    def forward_tilt(self, x):
+        uzx= lambda xpos: self.forward(xpos,self.get_ys(dataset='tilt'),x)[2]
+        uzy= lambda ypos: self.forward(self.get_xs(dataset='tilt'),ypos,x)[2]
+        
+        duzx=-scipy.misc.derivative(uzx,self.get_xs(dataset='tilt'),dx=1e-6)
+        duzy=-scipy.misc.derivative(uzy,self.get_ys(dataset='tilt'),dx=1e-6)
+        
+        return duzx,duzy
 
     def get_obs(self):
         return self.data.get_obs()
 
-    def get_xs(self):
-        return self.data.get_xs()
+    def get_xs(self,dataset=None):
+        return self.data.get_xs(dataset)
 
-    def get_ys(self):
-        return self.data.get_ys()
+    def get_ys(self,dataset=None):
+        return self.data.get_ys(dataset)
 
-    def get_ts(self):
-        return self.data.get_ts()
+    def get_ts(self,dataset=None):
+        return self.data.get_ts(dataset)
     
-    def get_zs(self):
-        return self.data.get_zs()
+    def get_zs(self,dataset=None):
+        return self.data.get_zs(dataset)
 
-    def get_site_ids(self):
-        return self.data.get_site_ids()
+    def get_site_ids(self,dataset=None):
+        return self.data.get_site_ids(dataset)
 
-    def get_lats(self):
-        return self.data.get_lats()
+    def get_lats(self,dataset=None):
+        return self.data.get_lats(dataset)
 
-    def get_lons(self):
-        return self.data.get_lons()
+    def get_lons(self,dataset=None):
+        return self.data.get_lons(dataset)
     
     def get_orders(self):
         orders=[]
@@ -63,10 +113,7 @@ class Source:
         return orders
     
     def get_model_los(self,x0):
-        ux,uy,uz = self.forward_gps(x0)
-        los=ux*np.sin(self.data.data['lk'].to_numpy())*np.cos(self.data.data['az'].to_numpy())-uy*np.sin(self.data.data['lk'].to_numpy())*np.sin(self.data.data['az'].to_numpy())-uz*np.cos(self.data.data['lk'].to_numpy())
-        los=-los
-        return los
+        return self.forward_insar(x0)
         
     def get_model_3d(self,x0):
         ux,uy,uz = self.forward_gps(x0)
@@ -80,23 +127,53 @@ class Source:
         dux,duy = self.forward_tilt(x0)
         return np.concatenate((dux,duy)).ravel()
     
-    def get_model(self,x0):
+    def get_model(self,x0,wts=1):
         pars=np.copy(x0)
         parnames=self.get_parnames()
-        
         for i in range(len(pars)):
             order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
             if parnames[i]=='pressure':
                 pars[i]=10**pars[i]
             else:
                 pars[i]=pars[i]*10**order
-        if self.data.type=='gps':
-            return self.get_model_3d(pars)
-        elif self.data.type=='insar':
-            return self.get_model_los(pars)
-        elif self.data.type=='tilt':
-            return self.get_model_tilt(pars)*1e6
-    
+        if self.data.type=='gps' or self.data.type=='joint':
+            gps=self.get_model_3d(pars)
+            if self.data.type=='gps':
+                return gps
+        if self.data.type=='insar' or self.data.type=='joint':
+            insar=self.get_model_los(pars)
+            if self.data.type=='insar':
+                return insar
+        if self.data.type=='tilt' or self.data.type=='joint':
+            tilt=self.get_model_tilt(pars)*1e6
+            if self.data.type=='tilt':
+                return tilt
+        if self.data.type=='joint':
+            data=np.concatenate((gps,insar,tilt))
+            return data*wts
+    def get_weights(self,wts):
+        if self.data.type=='joint':
+            if len(wts)<=3:
+                if len(self.get_xs('gps'))==0:
+                    winsar=self.get_xs('insar')*0+wts[0]
+                    wtilt=self.get_xs('tilt')*0+wts[1]
+                    return np.concatenate((winsar,wtilt,wtilt))
+                elif len(self.get_xs('insar'))==0:
+                    wgps=self.get_xs('gps')*0+wts[0]
+                    wtilt=self.get_xs('tilt')*0+wts[1]
+                    return np.concatenate((wgps,wgps,wgps,wtilt,wtilt))
+                elif len(self.get_xs('tilt'))==0:
+                    wgps=self.get_xs('gps')*0+wts[0]
+                    winsar=self.get_xs('insar')*0+wts[1]
+                    return np.concatenate((wgps,wgps,wgps,winsar))
+                else:
+                    wgps=self.get_xs('gps')*0+wts[0]
+                    winsar=self.get_xs('insar')*0+wts[1]
+                    wtilt=self.get_xs('tilt')*0+wts[2]
+                    return np.concatenate((wgps,wgps,wgps,winsar,wtilt,wtilt))
+            else:
+                return wts
+            
     def get_residual(self,x0):
         ux,uy,uz = self.forward_mod(x0)
         return self.data-np.concatenate((ux,uy,uz)).ravel()
@@ -181,4 +258,6 @@ class Source:
 
         fig.show()        
    
+
+
 
