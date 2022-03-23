@@ -46,27 +46,7 @@ class Mctigue(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_gps(self, x):
-        return self.gps(x[0],x[1],x[2],x[3],x[4])
-
-    def forward_tilt(self, x):
-        return self.tilt(x[0],x[1],x[2],x[3],x[4])
     
-    def gps(self,xcen,ycen,d,rad,dV):
-        x=self.get_xs()
-        y=self.get_ys()
-        return self.model(x,y,xcen,ycen,d,rad,dV)
-    
-    def tilt(self,xcen,ycen,d,rad,dV):
-        
-        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,d,rad,dV)[2]
-        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,d,rad,dV)[2]
-        
-        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
-
     def model(self, x, y, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
        
         """
@@ -94,7 +74,6 @@ class Mctigue(Source):
         # center coordinate grid on point source
         x = x - xcen
         y = y - ycen
-        
         if rad>d:
             return x*np.Inf,x*np.Inf,x*np.Inf
         
