@@ -39,26 +39,6 @@ class Penny(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_gps(self, x):
-        return self.gps(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
-
-    def forward_tilt(self, x):
-        return self.tilt(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
-    
-    def gps(self,xcen,ycen,d,P_G,a):
-        x=self.get_xs()
-        y=self.get_ys()
-        return self.model(x,y,xcen,ycen,d,P_G,a)
-    
-    def tilt(self,xcen,ycen,d,P_G,a):
-        
-        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,d,P_G,a)[2]
-        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,d,P_G,a)[2]
-        
-        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
     
     def model(self,x,y,xcen,ycen,d,P_G,a,nu=0.25):
         """
