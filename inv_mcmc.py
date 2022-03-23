@@ -34,13 +34,15 @@ def inversion(source,data,wts=1.0):
         #Deformation is the deterministic variable
         @pymc.deterministic(plot=False)
         def defo(model_pars=model_pars):
-            return source.get_model(model_pars)
+            return source.get_model(model_pars,wts)
 
         #Probability distribution
-        z = pymc.Normal('z', mu=defo, tau=1.0*wts/sigma, value=data, observed=True)
+        z = pymc.Normal('z', mu=defo, tau=1.0/sigma, value=data*wts, observed=True)
+        #z = pymc.Normal('z', mu=defo, tau=wts, value=data, observed=True)
         return locals()
 
     #Making MCMC model
+    #MDL = pymc.MCMC(model(data),db='pickle', dbname=source.get_source_id()+'.pickle')
     MDL = pymc.MCMC(model(data))
 
     #Choosing Adaptive Metropolis-Hastings for step method
@@ -80,5 +82,6 @@ def inversion(source,data,wts=1.0):
     for i in range(source.get_num_params()):
         traces.append(MDL.trace(parnames[i]))
     traces=np.array(traces)
+    #MDL.db.close()
     return traces,MDL
 
