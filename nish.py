@@ -19,7 +19,6 @@ import scipy
 from source import Source
 
 class Nish(Source):
-
     def get_num_params(self):
         ist=np.sum(~np.isnan(self.data.data['t'].to_numpy()))
         if ist>0:
@@ -55,51 +54,6 @@ class Nish(Source):
     # =====================
     # Forward Models
     # =====================
-    def forward_gps(self, x):
-        ist=np.sum(~np.isnan(self.data.data['t'].to_numpy()))
-        if ist>0:
-            return self.gps_t(x[0],x[1],x[2],x[3],x[4],x[5],x[6])
-        else:
-            return self.gps(x[0],x[1],x[2],x[3],x[4],x[5])
-
-    def forward_tilt(self, x):
-        ist=np.sum(~np.isnan(self.data.data['t'].to_numpy()))
-        if ist>0:
-            return self.tilt_t(x[0],x[1],x[2],x[3],x[4],x[5],x[6])
-        else:
-            return self.tilt(x[0],x[1],x[2],x[3],x[4],x[5])
-    
-    def gps(self,xcen,ycen,d,a,h,dP):
-        x=self.get_xs()
-        y=self.get_ys()
-        return self.model(x,y,xcen,ycen,d,a,h,dP)
-    
-    def gps_t(self,xcen,ycen,d,a,h,dP,td,model='nb'):
-        x=self.get_xs()
-        y=self.get_ys()
-        t=self.get_ts()
-        return self.model_t(x,y,xcen,ycen,d,a,h,dP,td,t,model=model)
-    
-    def tilt(self,xcen,ycen,d,a,h,dP):
-        
-        uzx= lambda x: self.model(x,self.get_ys(),xcen,ycen,d,a,h,dP)[2]
-        uzy= lambda y: self.model(self.get_xs(),y,xcen,ycen,d,a,h,dP)[2]
-        
-        duzx=scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
-
-    def tilt_t(self,xcen,ycen,d,a,h,dP,td,model='nb'):
-        
-        t=self.get_ts()
-        uzx= lambda x: self.model_t(x,self.get_ys(),xcen,ycen,d,a,h,dP,td,t,model=model)[2]
-        uzy= lambda y: self.model_t(self.get_xs(),y,xcen,ycen,d,a,h,dP,td,t,model=model)[2]
-        
-        duzx=-scipy.misc.derivative(uzx,self.get_xs(),dx=1e-6)
-        duzy=-scipy.misc.derivative(uzy,self.get_ys(),dx=1e-6)
-        
-        return duzx,duzy
     
     def model(self, x, y, xcen, ycen, d, a, h, dP, nu=0.25, mu=4e9,rho=2500):
        
