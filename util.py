@@ -9,6 +9,8 @@ import numpy as np
 import numpy.ma as ma
 import time
 import math
+import os
+import subprocess
 
 def psi_phi(h):
     t,w=gauleg(0,1,41)
@@ -126,6 +128,25 @@ def gauleg(a,b,n):
     #contribs = cs*f(ts)
     #return coeffm*np.sum(contribs)
     return ts[::-1],ws
+
+'''
+def gauleg(x1,x2,N):
+    eps=1e-8
+    z=np.zeros(N)
+    xm = 0.5*(x2+x1)
+    xl = 0.5*(x2-x1)
+    for n in range(N):
+        z[n] = np.cos(np.pi*((n+1)-0.25)/(N+0.5))
+        z1 = 100*z[n]
+        while np.abs(z1-z[n])>eps:
+            pN,dpN=legpol(z[n],N+1)
+            z1=z[n]
+            z[n]=z1-pN/dpN
+    pN,dpN=legpol(z,N+1)
+    x=xm-xl*z
+    w = 2*xl/((1-np.power(z,2))*np.power(dpN,2))
+    return x,w
+'''
 
 def gauleg_params1(n):
     xs,cs=np.polynomial.legendre.leggauss(n)
@@ -353,3 +374,56 @@ def get_cart2los_bak(inc, ald, x):
     cart2los = -np.dstack([EW2los, NS2los, Z2los])
 
     return cart2los
+
+def write_rsc(los,az,lk,wl,extent,units):
+    stepx=(extent[1]-extent[0])/los.shape[1]
+    stepy=(extent[2]-extent[3])/los.shape[0]
+    if units=='m':
+        unit='meters'
+    elif units=='deg':
+        unit='degrees'
+    files=['varres/insar.unw.rsc','varres/incidence.unw.rsc']
+    for archivo in files:
+        rsc=open(archivo,'w')
+        rsc.write('FILE_LENGTH '+str(los.shape[0])+'\n')
+        rsc.write('WIDTH '+str(los.shape[1])+'\n')
+        rsc.write('X_FIRST '+str(extent[0])+'\n')
+        rsc.write('X_STEP '+str(stepx)+'\n')
+        rsc.write('X_UNIT '+unit+'\n')
+        rsc.write('Y_FIRST '+str(extent[3])+'\n')
+        rsc.write('Y_STEP '+str(stepy)+'\n')
+        rsc.write('Y_UNIT '+unit+'\n')
+        rsc.write('WAVELENGTH '+str(wl))
+        rsc.close()
+
+def write_unw(los,az,lk):
+    nxx=los.reshape(los.shape).shape[1]
+    nyy=los.reshape(los.shape).shape[0]
+    amp=np.ones((nyy,nxx),dtype=np.float32)
+    inp=np.zeros((nyy,2*nxx),dtype=np.float32)
+    inp[:,0:nxx]=amp
+    inp[:,nxx:]=los
+    archivo=open('varres/insar.unw','wb')
+    inp.tofile(archivo)
+    archivo.close()
+    if isinstance(az,float):
+        inp[:,0:nxx]=amp*(az)
+    else:
+        inp[:,0:nxx]=az
+    if isinstance(lk,float):
+        inp[:,0:nxx]=amp*(lk)
+    else:
+        inp[:,0:nxx]=lk
+    inp=inp.astype(np.float32)
+    archivo=open('varres/incidence.unw','wb')
+    inp.tofile(archivo)
+    archivo.close()
+    
+def get_quadtree(los,az,lk,wl,extent,th=0.1,unit='m'):
+    write_unw(los,az,lk)
+    write_rsc(los,az,lk,wl,extent,unit)
+    cwd=os.getcwd()
+    os.chdir('./varres')
+    subprocess.call('python decompose.py -i insar.unw -g incidence.unw -t '+str(th)+' -o newtest',shell=True)
+    os.chdir(cwd)
+    
