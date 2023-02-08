@@ -141,6 +141,7 @@ class Inverse:
     
     def par2lin(self,pars):
         parnames,orders=self.get_parnames_orders()
+        
         linpars=[]
         for i in range(len(pars)):
             par=pars[i]
@@ -178,6 +179,7 @@ class Inverse:
                 for j,name in enumerate(parnames):
                     parnamest.append(name+str(k))
                     orderst.append(orders[j])
+            
             return parnamest,orderst
     
     def get_numsteps(self):
@@ -277,15 +279,20 @@ class Inverse:
         defo=None
         param_cnt = 0
         xlin=[]
+        linparst=self.par2lin(x)
+        
         for s in self.sources:
-            linpars=self.par2lin(x[param_cnt:param_cnt+s.get_num_params()])
-            xlin+=linpars
+            #linpars=self.par2lin(x[param_cnt:param_cnt+s.get_num_params()])
+            #xlin+=linpars
+            #print(x[param_cnt:param_cnt+s.get_num_params()],linpars)
+            linpars=linparst[param_cnt:param_cnt+s.get_num_params()]
             if defo is None:
                 defo=s.forward(linpars)
             else:
                 defo+=s.forward(linpars)
             param_cnt += s.get_num_params()
-        self.residual(xlin)
+        
+        self.residual(linparst)
         return defo
     
     ##output writers
