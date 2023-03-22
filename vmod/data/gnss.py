@@ -63,13 +63,12 @@ class Gnss(Data):
         self.add_errz(errz)
         super().add_err(self,np.concatenate((errx,erry,errz)))
     
-    def importcsv(self,csvfile):
-        names,xs,ys,uxs,uys,uzs,euxs,euys,euzs,ref=util.read_gnss_csv(csvfile)
+    def importcsv(self,csvfile,ori=None):
+        names,lons,lats,uxs,uys,uzs,euxs,euys,euzs=util.read_gnss_csv(csvfile)
         
         self.add_names(names)
         
-        self.add_xs(xs)
-        self.add_ys(ys)
+        self.add_lls(lons,lats,ori)
         
         self.add_ux(uxs)
         self.add_uy(uys)

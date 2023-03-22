@@ -51,6 +51,13 @@ class Okada(Source):
 
     def get_source_id(self):
         return "Okada"
+    
+    def bayesian_steps(self):
+        steps=5100000
+        burnin=100000
+        thin=1000
+        
+        return steps,burnin,thin
 
     def print_model(self, x):
         print("Okada")
@@ -242,6 +249,8 @@ class Okada(Source):
 
         # A few basic parameter checks
         if not (0.0 <= strike <= 360.0) or not (0 <= dip <= 90):
+            print('Strike',strike)
+            print('Dip',dip)
             print('Please use 0<strike<360 clockwise from North')
             print('And 0<dip<90 East of strike convention')
             raise ValueError

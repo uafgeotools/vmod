@@ -431,10 +431,13 @@ def write_unw(los,az,lk):
     inp.tofile(archivo)
     archivo.close()
     
-def ll2utm(lons,lats):
+def ll2utm(lons,lats,z1=None,z2=None):
     xs,ys=[],[]
     for i in range(len(lats)):
-        x,y,z1,z2=utm.from_latlon(lats[i], lons[i])
+        if z1 is None:
+            x,y,z1,z2=utm.from_latlon(lats[i], lons[i])
+        else:
+            x,y,z1,z2=utm.from_latlon(lats[i], lons[i],force_zone_number=z1, force_zone_letter=z2)
         xs.append(x)
         ys.append(y)
     xs=np.array(xs)
@@ -550,12 +553,14 @@ def rewrite_csv(los,ref,old,name='output.txt'):
     archivo=open(old,'r')
     lines=archivo.readlines()
     archivo.close()
+    
+    result=open(name,'w')
     result.write(lines[0].split(':')[0]+': '+str(ref[0])+','+str(ref[1])+', Dimensions:'+lines[0].split('Dimensions:')[1])
     for i in range(len(lines)-1):
         i+=1
         linef=lines[i].split()
         line="%6.3f %6.3f %1.6f %1.6f %1.6f %1.9f %5.0f %5.0f %5.0f %5.0f\n"\
-                % (linef[0],linef[1],linef[2],linef[3],los[i-1],linef[5],linef[6],linef[7],linef[8],linef[9])
+                % (float(linef[0]),float(linef[1]),float(linef[2]),float(linef[3]),los[i-1],float(linef[5]),float(linef[6]),float(linef[7]),float(linef[8]),float(linef[9]))
         
         result.write(line)
     result.close()
@@ -657,7 +662,8 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None):
     def quadtree_im(im,inverts,th):
         #if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
         #if np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
-        if np.sum(np.isnan(im))<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
+        #if np.sum(np.isnan(im))<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
+        if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
             y=np.arange(im.shape[0]).astype(float)+inverts[0]
             x=np.arange(im.shape[1]).astype(float)+inverts[1]
             xx,yy=np.meshgrid(x,y)
@@ -821,7 +827,7 @@ def points2map(xs,ys,data):
             qmap[j,i]=data[i*len(lons)+j]
     return qmap,extent
 
-def get_defmap(quadfile='quadtree.txt',mask=None):
+def get_defmap(quadfile='quadtree.txt',mask=None, trans=False):
     quad=open(quadfile)
     linesor=quad.readlines()
     quad.close()
@@ -834,8 +840,8 @@ def get_defmap(quadfile='quadtree.txt',mask=None):
         rcoords=[float(linesor[0].split(':')[1].split(',')[0]),float(linesor[0].split(':')[1].split(',')[1])]
         intc=(ext[1]-ext[0])/dim[1]
         intr=(ext[3]-ext[2])/dim[0]
-        col=int((rcoords[0]-ori[0])/intc)
-        row=int((ori[3]-rcoords[1])/intr)
+        col=int((rcoords[0]-ext[0])/intc)
+        row=int((ext[3]-rcoords[1])/intr)
     
     lines=[line for line in linesor if not line[0]=='%']
     
@@ -860,12 +866,19 @@ def get_defmap(quadfile='quadtree.txt',mask=None):
     qlos=np.array(qlos)
     
     if 'None' in linesor[0]:
-        posmin=np.argmin(qlos)
+        posmin=np.argmin(np.abs(qlos))
         rcoords=[xs[posmin],ys[posmin]]
     
     quad[:,:]-=qlos[posmin]
     if mask is not None:
         quad[mask]=np.nan
+    
+    if trans:
+        utmxs,utmys,z1s,z2s=ll2utm([ext[0],ext[1]],[ext[2],ext[3]])
+        refxs,refys,z1s,z2s=ll2utm([rcoords[0]],[rcoords[1]])
+        ext=[utmxs[0],utmxs[1],utmys[0],utmys[1]]
+        rcoords=[refxs[0],refys[0]]
+        
     return quad,ext,rcoords
 '''    
 def get_defmap(quadfile='quadtree.txt',mask=None,unit='deg'):
@@ -995,7 +1008,13 @@ def get_closest_point(row,col,dataset):
 def read_dataset_h5(h5file,key,plot=True,aoi=None):
     h5f=h5py.File(h5file)
     dataset=h5f[key][:]
-    lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
+    
+    lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2'])]
+    lats=[float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])]
+    
+    lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
+    #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
+    
     extent=[lonr1,lonr2,latr1,latr2]
     h5f.close()
     
@@ -1024,7 +1043,7 @@ def read_dataset_h5(h5file,key,plot=True,aoi=None):
     plt.colorbar(im,orientation='horizontal')
     return dataset
 
-def read_gnss_csv(csvfile,unit='m'):
+def read_gnss_csv(csvfile,trans=False):
     archivo=open(csvfile,'r')
     linesor=archivo.readlines()
     archivo.close()
@@ -1052,7 +1071,7 @@ def read_gnss_csv(csvfile,unit='m'):
     euys=np.array(euys)
     euzs=np.array(euzs)
     
-    if unit=='m':
+    if trans:
         xs,ys,z1s,z2s=ll2utm(lons,lats)
         meanx=np.mean(xs)
         meany=np.mean(ys)
@@ -1061,9 +1080,9 @@ def read_gnss_csv(csvfile,unit='m'):
         ref=[meanx,meany,z1s,z2s]
         return names,xs,ys,uxs,uys,uzs,euxs,euys,euzs,ref
     else:
-        return names,lons,lats,uxs,uys,uzs,euxs,euys,euzs
+        return names,np.array(lons),np.array(lats),uxs,uys,uzs,euxs,euys,euzs
 
-def read_insar_csv(csvfile,trans=False,unit='m'):
+def read_insar_csv(csvfile,trans=False,unit='m',ori=None):
     #if ref and os.path.exists('./'+csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]):
     #    csvfile=csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]
     archivo=open(csvfile,'r')
@@ -1207,7 +1226,11 @@ class AOI_Selector:
                     velocity=h5f['velocity'][:]
                 except:
                     raise Exception('This dataset does not have LOS deformation')
-        lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
+                    
+        lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2'])]
+        lats=[float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])]
+        lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
+        #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
         self.wl=float(h5f.attrs['WAVELENGTH'])
         
         h5f.close()
@@ -1228,11 +1251,11 @@ class AOI_Selector:
         self.x2 = None
         self.y2 = None
         if not vmin:
-            self.vmin = np.nanpercentile(self.image, 1)
+            self.vmin = -np.nanmax(np.abs(velocity))
         else:
             self.vmin = vmin
         if not vmax:
-            self.vmax=np.nanpercentile(self.image, 99)
+            self.vmax = np.nanmax(np.abs(velocity))
         else:
             self.vmax = vmax
         if fig_xsize and fig_ysize:
@@ -1363,7 +1386,8 @@ class Ref_Insar_Selector:
             im=ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=-np.nanmax(np.abs(velocity)), vmax=np.nanmax(np.abs(velocity)))
         else:
             im=ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=vmin, vmax=vmax)
-        line,=ax.plot([refcoords[0]], [refcoords[1]],'ko',label='Reference')
+        #line,=ax.plot([refcoords[0]], [refcoords[1]],'ko',label='Reference')
+        line,=ax.plot([ref[0]], [ref[1]],'ko',label='Reference')
         
         ax.set_ylabel('Latitude (°)')
         ax.set_xlabel('Longitude (°)')

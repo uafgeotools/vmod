@@ -1,7 +1,7 @@
 """
 Class to implement inverse methods operating on one or more analytical volcanic source models
 
-Author: Ronni Grapenthin
+Author: Mario Angarita & Ronni Grapenthin
 Date: 6/23/2021
 
 
@@ -15,8 +15,12 @@ import pymc
 import sys
 import pickle
 from scipy.optimize import least_squares
+from scipy.optimize import basinhopping
+from scipy.optimize import differential_evolution
+from scipy.optimize import shgo
 import random
 import string
+import time
 
 class Inverse:
     def __init__(self, obs):
@@ -40,7 +44,37 @@ class Inverse:
         params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds()))
         print(self.minresidual)
         return params
-
+    
+    def bh(self):
+        self.minresidual=1e6
+        minimizer_kwargs = dict(method="L-BFGS-B", bounds=self.get_bounds_de())
+        if len(self.sources)==0:
+            raise Exception('You need to include at least one source')
+        
+        params = copy.deepcopy(basinhopping(self.residual_bh, self.get_x0(),niter=100,minimizer_kwargs=minimizer_kwargs))
+        print(self.minresidual)
+        return params
+    
+    def de(self):
+        self.minresidual=1e6
+        if len(self.sources)==0:
+            raise Exception('You need to include at least one source')
+        
+        params = copy.deepcopy(differential_evolution(self.residual_bh, bounds=self.get_bounds_de()))
+        print(self.minresidual)
+        return params
+    
+    def shg(self):
+        self.minresidual=1e6
+        if len(self.sources)==0:
+            raise Exception('You need to include at least one source')
+        start=time.time()
+        params = copy.deepcopy(shgo(self.residual_bh, bounds=self.get_bounds_de()))
+        end=time.time()
+        print('Time:',end-start)
+        print(self.minresidual)
+        return params
+    
     def mcmc(self,name=None):
         self.minresidual=1e6
         data=self.obs.get_data()
@@ -184,8 +218,8 @@ class Inverse:
     
     def get_numsteps(self):
         if len(self.sources)>1:
-            steps=3300000
-            burnin=10000
+            steps=6600000
+            burnin=600000
             thin=1000
         else:
             source=self.sources[0]
@@ -211,6 +245,18 @@ class Inverse:
             high_b = np.concatenate((high_b, s.high_bounds))
 
         return (low_b, high_b)
+    
+    def get_bounds_de(self):
+        bounds  = []
+
+        for s in self.sources:
+            for i in range(len(s.high_bounds)):
+                if len(bounds)==0:
+                    bounds=[(s.low_bounds[i],s.high_bounds[i])]
+                else:
+                    bounds = np.concatenate((bounds,[(s.low_bounds[i],s.high_bounds[i])]))
+
+        return bounds
 
     #least_squares residual function for dipole
     def fun(self, x):
@@ -249,9 +295,21 @@ class Inverse:
         if self.minresidual>rest:
             self.minresidual=rest
             self.minparms=x
-            
-        return res
         
+        return res
+    
+    def residual_bh(self,x):
+        if self.obs.get_errors() is None:
+            res=self.obs.get_data()-self.forward(x)
+        else:
+            res=(self.obs.get_data()-self.forward(x))/self.obs.get_errors()
+        rest=np.sqrt(np.sum(res**2))
+        if self.minresidual>rest:
+            self.minresidual=rest
+            self.minparms=x
+        
+        return rest
+    
     def inv_opening(self,xcen,ycen,depth,length,width,strike,dip,ln,wn,reg=False,lamb=1):
         s=self.sources[0]
         G=s.get_greens(xcen,ycen,depth,length,width,strike,dip,ln,wn)

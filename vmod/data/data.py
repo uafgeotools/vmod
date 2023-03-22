@@ -15,6 +15,8 @@ class Data:
         self.names=None
         self.xs=None
         self.ys=None
+        self.lons=None
+        self.lats=None
         self.zs=None
         self.ts=None
         self.comps=None
@@ -34,11 +36,19 @@ class Data:
         self.assert_size(names,'names')
         self.names=names
     
-    def add_lls(self,lons,lats):
+    def add_lls(self,lons,lats,ori=None):
         xs,ys,z1s,z2s=util.ll2utm(lons,lats)
-        self.utmz=[np.mean(xs),np.mean(ys),z1s,z2s]
-        self.add_xs(xs-np.mean(xs))
-        self.add_ys(ys-np.mean(ys))
+        if ori is None:
+            self.utmz=[np.mean(xs),np.mean(ys),z1s,z2s]
+            self.add_xs(xs-np.mean(xs))
+            self.add_ys(ys-np.mean(ys))
+        else:
+            orix,oriy,z1sor,z2sor=util.ll2utm([ori[0]],[ori[1]],z1=z1s,z2=z2s)
+            self.utmz=[orix[0],oriy[0],z1sor,z2sor]
+            self.add_xs(xs-orix[0])
+            self.add_ys(ys-oriy[0])
+        self.lons=lons
+        self.lats=lats
         
     def add_ys(self,ys):
         self.assert_size(ys,'ys')
@@ -47,10 +57,6 @@ class Data:
     def add_xs(self,xs):
         self.assert_size(xs,'xs')
         self.xs=xs
-        
-    def add_ys(self,ys):
-        self.assert_size(ys,'ys')
-        self.ys=ys
     
     def add_zs(self,zs):
         self.assert_size(zs,'zs')

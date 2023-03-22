@@ -108,8 +108,8 @@ class Yang(Source):
             print('Error: ({0}, {1}) lies outside grid Easting[{2:g}, {3:g}] Northing[{4:g}, {5:g}]'.format(xcen,ycen,minx,maxx,miny,maxy))
             return    
         '''
-        d_crita = a * np.sin(np.deg2rad(theta))
-        d_critb = a * np.sin(np.deg2rad(theta))
+        d_crita = a * np.sin(np.deg2rad(theta))/2
+        d_critb = a * np.sin(np.deg2rad(theta))/2
         nans=np.array([x*np.nan,x*np.nan,x*np.nan])
         if d_crita>=z0 or d_critb>=z0:
             return nans

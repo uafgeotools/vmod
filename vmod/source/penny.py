@@ -19,6 +19,13 @@ class Penny(Source):
     
     def time_dependent(self):
         return False
+    
+    def bayesian_steps(self):
+        steps=110000
+        burnin=10000
+        thin=100
+        
+        return steps,burnin,thin
 
     def print_model(self, x):
         print("Penny-shaped Crack:")

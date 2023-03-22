@@ -43,13 +43,21 @@ class Insar(Data):
                 self.add_names(names)
             super().add_ref(names[posmin])
     
-    def importcsv(self,csvfile):
-        xs,ys,azs,lks,los,elos,ref=util.read_insar_csv(csvfile,trans=True)
+    def importcsv(self,csvfile,ori=None):
+        lons,lats,azs,lks,los,elos,ref=util.read_insar_csv(csvfile)
+        
+        if np.abs(np.nanmean(azs))>2*np.pi:
+            azs=np.radians(azs)
+            lks=np.radians(lks)
         self.add_vecs(azs,lks)
-        self.add_xs(xs)
-        self.add_ys(ys)
+        self.add_lls(lons,lats,ori)
         self.add_los(los)
         self.add_err(elos)
+        if ref is not None:
+            if len(ref)==2:
+                orix,oriy,z1sor,z2sor=util.ll2utm([ori[0]],[ori[1]])
+                refx,refy,z1sor,z2sor=util.ll2utm([ref[0]],[ref[1]],z1=z1sor,z2=z2sor)
+                ref=[refx[0]-orix[0],refy[0]-oriy[0],orix[0],oriy[0],str(z1sor)+str(z2sor)]
         self.add_ref(ref)
         
     def from_model3d(self,func,unravel=True):
