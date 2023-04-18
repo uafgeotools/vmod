@@ -446,7 +446,7 @@ def ll2utm(lons,lats,z1=None,z2=None):
 
 def utm2ll(xs,ys,z1,z2):
     lons,lats=[],[]
-    for i in range(len(lats)):
+    for i in range(len(xs)):
         lat,lon=utm.to_latlon(xs[i], ys[i], z1, z2)
         lons.append(lon)
         lats.append(lat)
@@ -827,7 +827,7 @@ def points2map(xs,ys,data):
             qmap[j,i]=data[i*len(lons)+j]
     return qmap,extent
 
-def get_defmap(quadfile='quadtree.txt',mask=None, trans=False):
+def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
     quad=open(quadfile)
     linesor=quad.readlines()
     quad.close()
@@ -869,7 +869,8 @@ def get_defmap(quadfile='quadtree.txt',mask=None, trans=False):
         posmin=np.argmin(np.abs(qlos))
         rcoords=[xs[posmin],ys[posmin]]
     
-    quad[:,:]-=qlos[posmin]
+    if cref:
+        quad[:,:]-=qlos[posmin]
     if mask is not None:
         quad[mask]=np.nan
     
@@ -1041,6 +1042,7 @@ def read_dataset_h5(h5file,key,plot=True,aoi=None):
     ax.set_ylabel('Latitude (°)')
     ax.set_xlabel('Longitude (°)')
     plt.colorbar(im,orientation='horizontal')
+    print(extent)
     return dataset
 
 def read_gnss_csv(csvfile,trans=False):
@@ -1082,7 +1084,7 @@ def read_gnss_csv(csvfile,trans=False):
     else:
         return names,np.array(lons),np.array(lats),uxs,uys,uzs,euxs,euys,euzs
 
-def read_insar_csv(csvfile,trans=False,unit='m',ori=None):
+def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
     #if ref and os.path.exists('./'+csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]):
     #    csvfile=csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]
     archivo=open(csvfile,'r')
@@ -1109,7 +1111,7 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None):
     if linesor[0][0]=='%' and not 'None' in linesor[0]:
         ref=[float(linesor[0].split(':')[1].split(',')[0]),float(linesor[0].split(':')[1].split(',')[1])]
         posmin=np.argmin((lons-ref[0])**2+(lats-ref[1])**2)
-    elif linesor[0][0]=='%':
+    elif linesor[0][0]=='%' and cref:
         posmin=np.argmin(np.abs(los))
         ref=[lons[posmin],lats[posmin]]
         los-=los[posmin]
@@ -1127,15 +1129,22 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None):
     else:
         return lons,lats,azs,lks,los,elos,ref
 
-def plot_gnss(xs,ys,uxs,uys,uzs,names=None,euxs=None,euys=None,euzs=None,scl=None,unit='m'):
+def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=None,scl=None,unit='m',figsize=None):
     #Plotting GPS deformation
     if unit=='m':
         norm=1e3
     else:
         norm=1.0
     ratio=0.2
-    plt.figure(figsize=(5,5))
-    plt.title('GPS data')
+    if figsize:
+        plt.figure(figsize=figsize)
+    else:
+        plt.figure(figsize=(5,5))
+    
+    if title:
+        plt.title(title)
+    else:
+        plt.title('GPS data')
     plt.scatter(xs/norm,ys/norm,s=10)
     hmax=np.max(np.sqrt(uxs**2+uys**2))
     extentx=(np.max(xs)-np.min(xs))/norm
@@ -1151,10 +1160,13 @@ def plot_gnss(xs,ys,uxs,uys,uzs,names=None,euxs=None,euys=None,euzs=None,scl=Non
     if unit=='m':
         sposx=limsx[0]+ratio/4*(limsx[1]-limsx[0])
         sposy=limsy[1]-ratio/4*(limsy[1]-limsy[0])
+        sposy2=limsy[0]+ratio/4*(limsx[1]-limsx[0])
     else:
         sposx=limsx[0]+ratio/10*(limsx[1]-limsx[0])
         sposy=limsy[1]-ratio/10*(limsy[1]-limsy[0])
+        sposy2=limsy[0]+ratio/10*(limsx[1]-limsx[0])-0.05*(limsy[1]-limsy[0])
     sposy1=sposy-0.05*(limsy[1]-limsy[0])
+    
     
     if scl is None:
         scale=ratio*extent/hmax
@@ -1176,7 +1188,10 @@ def plot_gnss(xs,ys,uxs,uys,uzs,names=None,euxs=None,euys=None,euzs=None,scl=Non
     if euzs is not None:
         plt.errorbar(xs/norm,ys/norm+uzs*scale,euzs*scale,fmt='bo',ms=1)
     plt.annotate("", xy=(sposx+sc*scale, sposy), xytext=(sposx, sposy),arrowprops=dict(arrowstyle="->",color="red"))
-    plt.annotate(str(scl)+r"cm/yr Obs", xy=(sposx, sposy1), xytext=(sposx, sposy1),color='red')
+    plt.annotate(str(scl)+r"cm/yr", xy=(sposx, sposy1), xytext=(sposx, sposy1),color='red')
+    
+    plt.annotate("", xy=(sposx, sposy2+sc*scale), xytext=(sposx, sposy2),arrowprops=dict(arrowstyle="-",color="black"))
+    plt.annotate(str(scl)+r"cm/yr", xy=(sposx, sposy2), xytext=(sposx, sposy2),color='black')
     if unit=='m':
         plt.ylabel('Y(km)')
         plt.xlabel('X(km)')
@@ -1192,6 +1207,39 @@ def plot_gnss(xs,ys,uxs,uys,uzs,names=None,euxs=None,euys=None,euzs=None,scl=Non
     #plt.axis('equal')
     #plt.axis('scaled')
     plt.show()
+
+def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
+    archivo=open(quadfile,'r')
+    lines=archivo.readlines()
+    archivo.close()
+
+    dim=[int(lines[0].split('Dimensions:')[1].split(',')[i]) for i in range(2)]
+    
+    result=open('temp.txt','w')
+    result.write(lines[0])
+    for i in range(len(lines)-1):
+        i+=1
+        linef=lines[i].split()
+        line="%6.3f %6.3f %1.6f %1.6f %1.6f %1.9f %5.0f %5.0f %5.0f %5.0f\n"\
+                    % (float(linef[0]),float(linef[1]),float(linef[2]),float(linef[3]),los[i-1],float(linef[5]),float(linef[6]),float(linef[7]),float(linef[8]),float(linef[9]))
+
+        result.write(line)
+    result.close()
+    
+    if maskfile:
+        mask_des=np.load(maskfile)
+    else:
+        mask_des=np.zeros((dim[0],dim[1]))
+        mask_des=mask_des>0
+        
+    qmap,extent,rcoords=get_defmap('temp.txt',mask=mask_des,trans=False,cref=cref)
+
+    subprocess.call('rm -rf temp.txt',shell=True)
+    
+    if output:
+        np.save(output,qmap)
+    
+    return qmap,extent
     
 class AOI_Selector:
     def __init__(self,

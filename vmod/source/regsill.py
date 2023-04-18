@@ -1,7 +1,7 @@
 import numpy as np
 from .. import util
 from . import Source
-from . import Okada
+from .okada import Okada
 
 class Regsill(Source):
     def __init__(self, data, typ=None, ln=None, wn=None):

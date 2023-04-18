@@ -1,7 +1,7 @@
 import numpy as np
 from .. import util
 from . import Source
-from . import Okada
+from .okada import Okada
 
 class CRFault(Source):
     def __init__(self, data, ori=None, segs=None, lw=None):
