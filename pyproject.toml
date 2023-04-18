@@ -1,0 +1,35 @@
+[build-system]
+requires = [
+    "setuptools>=61.0.0",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vmod"
+version = "0.0.1"
+description = "Volcano source model and inversion framework for geodesy"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE.txt"}
+authors = [
+    {name = "Mario Angarita Vargas"},
+    {email = "mfangaritasr@alaska.edu"}
+]
+dependencies = [
+    "global_land_mask==1.0.0",
+    "h5py==3.7.0",
+    "ipython==8.8.0",
+    "matplotlib==3.5.3",
+    "numpy==1.23.5",
+    "pandas==1.5.3",
+    "pymc==5.3.0",
+    "rasterio==1.3.4",
+    "scipy==1.10.0",
+    "scikit-image==0.20.0",
+    "utm==0.7.0"
+]
+
+[project.urls]
+documentation = "ADD_ME"
+repository = "https://github.com/uafgeotools/vmod"
