@@ -11,9 +11,13 @@ import numpy as np
 class Edm(Data):
     def __init__(self):
         self.delta=None
+        self.lonsori=None
         self.xorigins=None
+        self.lonsend=None
         self.xends=None
+        self.latsori=None
         self.yorigins=None
+        self.latsend=None
         self.yends=None
         self.zorigins=None
         self.zends=None
@@ -63,7 +67,23 @@ class Edm(Data):
         self.yends=ends
         newcoords=self.add_coords(self.yends,self.ys,origin=False)
         self.add_ys(newcoords)
-
+        
+    def add_lls_lines(self,lons,lats,origin=True,ori=None):
+        if origin==True:
+            self.lonsori=lons
+            self.latsori=lats
+            if not self.lonsend is None:
+                lons=np.concatenate((self.lonsori,self.lonsend))
+                lats=np.concatenate((self.latsori,self.latsend))
+                self.add_lls(lons,lats,ori=ori)
+        else:
+            self.lonsend=lons
+            self.latsend=lats
+            if not self.lonsori is None:
+                lons=np.concatenate((self.lonsori,self.lonsend))
+                lats=np.concatenate((self.latsori,self.latsend))
+                self.add_lls(lons,lats,ori=ori)
+    
     def add_zorigins(self,origins):
         self.assert_origins_ends(origins)
         self.zorigins=origins

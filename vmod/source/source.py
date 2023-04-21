@@ -182,11 +182,11 @@ class Source:
             if self.data.__class__.__name__=='Tilt' and 'model_tilt_t' in dir(self):
                 func_tilt_time=lambda x,y,t: self.model_tilt_t(x,y,t,*args)
                 func_tilt.time.__name__ = 'func_tilt_time'
-                return self.data.from_model(func_tilt_time,unravel)
+                return self.data.from_model(func_tilt_time,offsets,unravel)
             elif 'model_t' in dir(self):
                 func_time=lambda x,y,t: self.model_t(x,y,t,*args)
                 func_time.__name__ = 'func_time'
-                return self.data.from_model(func_time,unravel)
+                return self.data.from_model(func_time,offsets,unravel)
             else:
                 raise Exception('The source does not have a time-dependent model defined')
     

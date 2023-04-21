@@ -80,10 +80,8 @@ class Gnss(Data):
         self.add_errz(euzs)
     
     def from_model3d(self,func,unravel=True):
-        if 'time' in func.__name__:
-            ux,uy,uz=func(self.xs,self.ys,self.ts)
-        else:
-            ux,uy,uz=func(self.xs,self.ys)
+        
+        ux,uy,uz=func(self.xs,self.ys)
             
         model=()
         

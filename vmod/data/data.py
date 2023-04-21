@@ -259,7 +259,11 @@ class Data:
         return ref_err
     
     def from_model(self,func,offsets=None,unravel=True):
-        model=self.from_model3d(func)
+        if 'time' in func.__name__:
+            funct=lambda x,y: func(x,y,self.ts)
+            model=self.from_model3d(funct)
+        else:
+            model=self.from_model3d(func)
         new_model=np.array([])
         if not offsets is None:
             if not len(model)==len(offsets):
