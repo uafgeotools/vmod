@@ -28,6 +28,7 @@ class Edm(Data):
         self.ts=ts
         
     def add_deltas(self,delta):
+        delta=delta.ravel()
         self.assert_origins_ends(delta)
         self.data=delta
         self.err=delta*0+1
