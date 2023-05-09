@@ -229,7 +229,7 @@ class Inverse:
     #initial guess of source model characteristics, defined when creating the source model
     def get_x0(self):
         x0 = []
-
+        
         for s in self.sources:
             x0 = np.concatenate((x0, s.x0))
 

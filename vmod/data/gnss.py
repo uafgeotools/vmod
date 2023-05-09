@@ -66,7 +66,7 @@ class Gnss(Data):
     def importcsv(self,csvfile,ori=None):
         names,lons,lats,uxs,uys,uzs,euxs,euys,euzs=util.read_gnss_csv(csvfile)
         
-        self.add_names(names)
+        self.add_names(np.array(names))
         
         self.add_lls(lons,lats,ori)
         
