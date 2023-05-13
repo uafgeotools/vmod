@@ -78,10 +78,11 @@ class Inverse:
     def mcmc(self,name=None):
         self.minresidual=1e6
         data=self.obs.get_data()
+        errors=self.obs.get_errors()
         if self.obs.err is None:
             wts=1.0
         else:
-            wts=1.0/self.obs.err
+            wts=1.0/errors
         def model(data):
             #Distribution for every parameter
             theta=[]
