@@ -5,10 +5,10 @@ from .okada import Okada
 
 class Regsill(Source):
     def __init__(self, data, typ=None, ln=None, wn=None):
-        if typ==None:
-            typ='open'
+        if typ==None or typ=='open':
+            self.typ='open'
         else:
-            typ='slip'
+            self.typ='slip'
         if ln==None:
             self.ln=1
         else:
@@ -49,7 +49,7 @@ class Regsill(Source):
         
         return [x1,x2,x3,x4],[y1,y2,y3,y4],[z1,z2,z3,z4]
         
-    def get_centers(self,xcen,ycen,depth,length,width,strike,dip,ln,wn):
+    def get_centers(self,xcen,ycen,depth,length,width,strike,dip):
         xc=xcen
         yc=ycen
         zc=-depth
@@ -140,14 +140,17 @@ class Regsill(Source):
         return L
         
     def get_reg_sill(self,xcen,ycen,depth,length,width,strike,dip,ops):
-        xs,ys,zs=self.get_centers(xcen,ycen,depth,length,width,strike,dip,ln,wn)
+        ln=self.ln
+        wn=self.wn
+        xs,ys,zs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
         oks=[]
         params=[]
         ln=self.ln
         wn=self.wn
         dat=self.data
         for i in range(len(xs)):
-            oki = Okada(dat,typ='open')
+            oki = Okada(dat)
+            oki.set_type('open')
             #Initial parameters [xcen,ycen,depth,length,width,opening,strike,dip]
             oki.set_bounds(low_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0], high_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0])
             oks.append(oki)
@@ -155,16 +158,25 @@ class Regsill(Source):
 
         return oks,params
     
-    def get_greens(self,x,y,xcen,ycen,depth,length,width,strike,dip):
+    def get_greens(self,xcen,ycen,depth,length,width,strike,dip):
         ln=self.ln
         wn=self.wn
+        x=self.data.xs
+        y=self.data.ys
+        
+        oki=Okada(self.data)
+        #print('Tipo',self.typ)
+        oki.set_type(self.typ)
+        
         xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
         xo=[xcen,ycen,depth,length,width,1,strike,dip]
-        defo=self.get_model(xo)
+        
+        defo=oki.forward(xo)
+        
         slength=length/ln
         swidth=width/wn
-        oki=Okada(None)
-        if typ=='open':
+        
+        if self.typ=='open':
             op=1
             sl=0
         else:
@@ -172,8 +184,11 @@ class Regsill(Source):
             sl=1
         G=np.zeros((len(defo),ln*wn))
         for i in range(len(xcs)):
-            xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,op,strike,dip]
-            defo=oki.model(x,y,*xp)
+            if self.typ=='open':
+                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,op,strike,dip]
+            else:
+                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,strike,dip]
+            defo=oki.forward(xp)
             G[:,i]=defo
         return G
     
@@ -185,7 +200,6 @@ class Regsill(Source):
         for i in range(len(xcs)):
             dist=(np.array(xcs)-xcs[i])**2+(np.array(ycs)-ycs[i])**2+(np.array(zcs)-zcs[i])**2
             pos=np.argsort(dist)
-            #print(dist[pos[0:5]])
             if dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]] and dist[pos[1]]==dist[pos[4]]:
                 L[i,pos[0]]=-2
                 L[i,pos[1]]=1
@@ -204,7 +218,7 @@ class Regsill(Source):
         return L
     
     def model(self,x,y,xcen,ycen,depth,length,width,strike,dip,ops):
-        G=self.get_greens(x,y,xcen,ycen,depth,length,width,strike,dip)
+        G=self.get_greens(xcen,ycen,depth,length,width,strike,dip)
         data=G@model
         
         ux=data[0:len(x)]
@@ -213,4 +227,37 @@ class Regsill(Source):
         
         return ux,uy,uz
         
+    def plot_patches(self,length,width,ops):
+        import matplotlib
+        import matplotlib.pyplot as plt
+        import numpy as np
         
+        ln=self.ln
+        wn=self.wn
+
+        ok1 = Okada(self.data)
+        ok1.set_type('open')
+        xs,ys,zs=self.get_centers(0,0,0,length,width,0,0)
+
+        patches=[]
+        fig, ax = plt.subplots()
+        for i in range(len(xs)):
+            rect = matplotlib.patches.Rectangle((xs[i]-length/(2*ln),ys[i]-width/(2*wn)), length/ln, width/wn)
+            patches.append(rect)
+
+        # values as numpy array
+        values = ops
+
+        # define the norm 
+        norm = plt.Normalize(values.min(), values.max())
+        coll = matplotlib.collections.PatchCollection(patches, cmap='viridis',
+                                                      norm=norm, match_original = True)
+
+        coll.set_array(values)
+        polys = ax.add_collection(coll)
+        fig.colorbar(polys, label='Opening(m)')
+
+        plt.xlim(-width/2,width/2)
+        plt.ylim(-length/2,length/2)
+
+        plt.show()

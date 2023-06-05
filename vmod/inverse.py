@@ -311,12 +311,12 @@ class Inverse:
         
         return rest
     
-    def inv_opening(self,xcen,ycen,depth,length,width,strike,dip,ln,wn,reg=False,lamb=1):
+    def inv_opening(self,xcen,ycen,depth,length,width,strike,dip,reg=False,lamb=1):
         s=self.sources[0]
-        G=s.get_greens(xcen,ycen,depth,length,width,strike,dip,ln,wn)
+        G=s.get_greens(xcen,ycen,depth,length,width,strike,dip)
         if reg==True:
-            d=np.array(self.obs.get_obs().tolist()+np.zeros((ln*wn,)).tolist())
-            L=s.get_laplacian(xcen,ycen,depth,length,width,strike,dip,ln,wn)
+            d=np.array(self.obs.get_data().tolist()+np.zeros((s.ln*s.wn,)).tolist())
+            L=s.get_laplacian(xcen,ycen,depth,length,width,strike,dip)
             #print(L)
             newG=np.concatenate((G,lamb*L),axis=0)
             ops=np.linalg.lstsq(newG, d, rcond=None)[0]

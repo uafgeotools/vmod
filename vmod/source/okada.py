@@ -558,34 +558,5 @@ class Okada(Source):
         
         return A
 
-def plot_patches(length,width,ln,wn,ops):
-    import matplotlib
-    import matplotlib.pyplot as plt
-    import numpy as np
     
-    ok1 = Okada(None,typ='open')
-    xs,ys,zs=ok1.get_centers(0,0,0,length,width,0,0,ln,wn)
-    
-    patches=[]
-    fig, ax = plt.subplots()
-    for i in range(len(xs)):
-        rect = matplotlib.patches.Rectangle((xs[i]-length/(2*ln),ys[i]-width/(2*wn)), length/ln, width/wn)
-        patches.append(rect)
-
-    # values as numpy array
-    values = ops
-
-    # define the norm 
-    norm = plt.Normalize(values.min(), values.max())
-    coll = matplotlib.collections.PatchCollection(patches, cmap='viridis',
-                                                  norm=norm, match_original = True)
-
-    coll.set_array(values)
-    polys = ax.add_collection(coll)
-    fig.colorbar(polys, label='Opening(m)')
-
-    plt.xlim(-width/2,width/2)
-    plt.ylim(-length/2,length/2)
-
-    plt.show()
 
