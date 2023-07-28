@@ -18,6 +18,7 @@ from scipy.optimize import least_squares
 from scipy.optimize import basinhopping
 from scipy.optimize import differential_evolution
 from scipy.optimize import shgo
+from scipy.optimize import lsq_linear
 import random
 import string
 import time
@@ -324,6 +325,18 @@ class Inverse:
             ops=np.linalg.lstsq(G, self.obs.get_obs(), rcond=None)[0]
         return ops
     
+    def inv_opening_positivity(self,xcen,ycen,depth,length,width,strike,dip,reg=False,lamb=1):
+        s=self.sources[0]
+        G=s.get_greens(xcen,ycen,depth,length,width,strike,dip)
+        if reg == True:
+            d    = np.array( self.obs.get_data().tolist() + np.zeros((s.ln*s.wn,)).tolist() )
+            L    = s.get_laplacian(xcen,ycen,depth,length,width,strike,dip)
+            newG = np.concatenate( (G,lamb*L) , axis=0 )
+            ops = lsq_linear( newG, d ,bounds=(0,np.Inf))
+        else:
+            ops = lsq_linear(G, self.obs.get_data(), bounds=(0,np.Inf))
+        return ops
+    
     def get_params_openings(self,xcen,ycen,depth,length,width,strike,dip,ln,wn,ops):
         s=self.sources[0]
         xcs,ycs,zcs=s.get_centers(xcen,ycen,depth,length,width,strike,dip,ln,wn)
@@ -420,5 +433,4 @@ class Inverse:
         else:
             print("No model, nothing to write")
 
-
-
+            
