@@ -11,9 +11,9 @@ TODO:
 
 import copy
 import numpy as np
-import pymc
 import sys
 import pickle
+from multiprocessing import Pool
 from scipy.optimize import least_squares
 from scipy.optimize import basinhopping
 from scipy.optimize import differential_evolution
@@ -21,6 +21,9 @@ from scipy.optimize import shgo
 import random
 import string
 import time
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
 
 class Inverse:
     def __init__(self, obs):
@@ -75,7 +78,103 @@ class Inverse:
         print(self.minresidual)
         return params
     
+    def log_prior(self,theta):
+        j=0
+        if not -10<theta[-1]<10:
+            return -np.inf
+        
+        for k,source in enumerate(self.sources):
+            parnames=source.get_parnames()
+            for i in range(source.get_num_params()):
+                low,high,ini=self.par2log(source,i)
+                if not low<theta[j]<high:
+                    return -np.inf
+                j+=1
+        
+        return 0.0
+    
+    def log_likelihood(self,theta):
+        model = self.get_model(theta[0:-1])
+        
+        errors=self.obs.get_errors()
+        data=self.obs.get_data()
+        sigma2 = errors**2 + model**2 * np.exp(2 * theta[-1])
+        likeli=-0.5 * np.sum((data - model) ** 2 / sigma2 + np.log(sigma2))
+        if np.isnan(likeli):
+            return -np.inf
+        return likeli
+    
+    def log_probability(self,theta):
+        lp = self.log_prior(theta)
+        if not np.isfinite(lp):
+            return -np.inf
+        likeli=self.log_likelihood(theta)
+        #print('lp',lp)
+        #print('likeli',likeli)
+        #print('likeli',np.isnan(likeli))
+        return lp + likeli
+    
+    def mcmc_em(self,name=None,move=None):
+        import emcee
+        
+        inis=[]
+        for k,source in enumerate(self.sources):
+            parnames=source.get_parnames()
+            for i in range(source.get_num_params()):
+                low,high,ini=self.par2log(source,i)
+                inis.append(ini)
+        inis.append(0.0)
+        
+        print(inis)
+        
+        steps,burnin,thin=self.get_numsteps()
+        
+        pos = np.array(ini) + 1e-4 * np.random.randn(2*len(inis), len(inis))
+        nwalkers, ndim = pos.shape
+
+        if move=='metropolis':
+            moves=emcee.moves.GaussianMove(1.0)
+        elif move=='stretch':
+            moves=emcee.moves.StretchMove()
+        elif move=='kde':
+            moves=emcee.moves.KDEMove()
+        elif move=='de':
+            moves=emcee.moves.DEMove()
+        elif move=='desnoooker':
+            moves=emcee.moves.DESnookerMove()
+        elif move=='redblue':
+            moves=emcee.moves.RedBlueMove()
+        
+        backend = emcee.backends.HDFBackend(name+'.h5')
+        backend.reset(nwalkers, ndim)
+        
+        with Pool() as pool:
+            if move is None:
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability, pool=pool, backend=backend)
+            else:
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability, pool=pool,moves=moves, backend=backend)
+            sampler.run_mcmc(pos, int(steps/nwalkers),skip_initial_state_check=True, progress=True)
+        
+        traces = sampler.get_chain(discard=int(burnin/nwalkers), thin=int(thin/nwalkers), flat=True)
+        
+        traces=traces.T.tolist()[0:-1]
+        
+        traces,labels=self.traces2lin(traces)
+        
+        if name is None:
+            name=''.join(random.choices(string.ascii_lowercase, k=5))
+        
+        solution=dict()
+        for i,trace in enumerate(traces):
+            solution[labels[i]]=trace
+        
+        with open(name+'.pkl', 'wb') as f:
+            pickle.dump(solution, f)
+        
+        return traces
+    
     def mcmc(self,name=None):
+        import pymc
         self.minresidual=1e6
         data=self.obs.get_data()
         errors=self.obs.get_errors()
@@ -191,12 +290,12 @@ class Inverse:
         labels=[]
         parnames,orders=self.get_parnames_orders()
         for i,trace in enumerate(traces):
+            temp=np.array(trace[:])
             if parnames[i]=='pressure':
-                temp=trace[:]
-                vdata=np.array([self.invdoublelog(temp[i]) for i in range(len(temp))])
+                vdata=np.array([self.invdoublelog(temp[j]) for j in range(len(temp))])
                 data.append(vdata)
             else:
-                data.append(trace[:]*orders[i])
+                data.append(temp*orders[i])
             labels.append(parnames[i])
         data=np.vstack(data)
         return data,labels

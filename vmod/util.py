@@ -132,7 +132,7 @@ def gauleg_params(n):
     return xs, cs
 
 def gauleg(a,b,n):
-    xs, cs = gauleg_params(n)
+    xs, cs = gauleg_params1(n)
     coeffp = 0.5*(b+a) 
     coeffm = 0.5*(b-a)
     ts = coeffp - coeffm*xs
@@ -640,15 +640,19 @@ def quadtree(los,az,lk,extent,per=100,unit='deg',th=1e-10,wl=1.0,name='newtest')
                 return
 
 
-def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None):
+def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     patch_kw = dict(patch_size=5,      # 5x5 patches
                     patch_distance=15,  # 13x13 search area
                     multichannel=True)
 
     imcp=np.copy(im)
     imcp[np.isnan(im)]=0
-
-    imfil=denoise_nl_means(imcp, h=0.6 * 0.5, sigma=0.5, fast_mode=True, **patch_kw)
+    
+    
+    if denoise:
+        imfil=denoise_nl_means(imcp, h=0.6 * 0.5, sigma=0.5, fast_mode=True, **patch_kw)
+    else:
+        imfil=np.copy(imcp)
 
     imfil[imcp==0]=np.nan
     
@@ -663,7 +667,8 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None):
         #if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
         #if np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
         #if np.sum(np.isnan(im))<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
-        if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
+        #if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
+        if im.shape[0]*im.shape[1]<=10 or np.sum(np.logical_not(np.isnan(im)))<2 or np.nanvar(im)<=th:
             y=np.arange(im.shape[0]).astype(float)+inverts[0]
             x=np.arange(im.shape[1]).astype(float)+inverts[1]
             xx,yy=np.meshgrid(x,y)
