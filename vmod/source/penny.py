@@ -1,11 +1,3 @@
-'''
-Penny-shaped Crack Solution from Fialko et al 2001
-* Based on dModels scripts Battaglia et. al. 2013
-* Check against figure 7.26 in Segall,
-which compares Fialko's solution to Davis 1986 point source
-* implemented only for single depth right now (no topographic correction)
-'''
-#from __future__ import division
 import numpy as np
 from .. import util
 import scipy
@@ -13,14 +5,27 @@ from scipy import special
 from . import Source
 
 class Penny(Source):
+    """
+    Class used to represent a penny-shaped crack using the Fialko (2001) model.
 
+    Attributes
+    ----------
+    parameters : array
+        names for the parameters in the model
+    """
     def get_source_id(self):
+        """
+        The function defining the name for the model.
+          
+        Returns:
+            str: Name of the model.
+        """
         return "Penny"
     
-    def time_dependent(self):
-        return False
-    
     def bayesian_steps(self):
+        """
+        Function that defines the number of steps for a bayesian inversion.
+        """
         steps=110000
         burnin=10000
         thin=100
@@ -28,6 +33,12 @@ class Penny(Source):
         return steps,burnin,thin
 
     def print_model(self, x):
+        """
+        The function prints the parameters for the model.
+        
+        Parameters:
+           x (list): Parameters for the model.
+        """
         print("Penny-shaped Crack:")
         print("\tx  = %f (m)" % x[0])
         print("\ty  = %f (m)" % x[1])
@@ -36,39 +47,34 @@ class Penny(Source):
         print("\ta  = %f (m)" % x[4])
         
     def set_parnames(self):
+        """
+        Function defining the names for the parameters in the model.
+        """
         self.parameters=("xcen","ycen","depth","pressure","radius")
-    
-    ##residual function for least_squares
-    def fun(self, x):
-        ux, uy, uz = self.forward(xcen=x[0], ycen=x[1], d=x[2], P_G=x[3], a=x[4])
-        diff =np.concatenate((ux,uy,uz))-self.get_obs()
-        return diff
-
+        
     # =====================
     # Forward Models
     # =====================
     
     def model(self,x,y,xcen,ycen,d,P_G,a,nu=0.25):
         """
-        Calculates surface deformation based on point pressure source
+        Calculates surface deformation based on pressurized penny-shaped crack
         References: Fialko
 
-        Args:
-        ------------------
-        x: x-coordinate grid (m)
-        y: y-coordinate grid (m)
-
-        Kwargs:
-        -----------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        dV: change in volume (m^3)
-        nu: poisson's ratio for medium
+        Parameters:
+            x: x-coordinate grid (m)
+            y: y-coordinate grid (m)
+            xcen: x-offset of penny-shaped crack (m)
+            ycen: y-offset of penny-shaped crack (m)
+            d: depth to penny-shaped crack (m)
+            P_G: normalized pressure with shear modulus
+            a: radius for penny shaped crack (m)
+            nu: poisson's ratio for medium
 
         Returns:
-        -------
-        (ux, uy, uz)
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
         """
 
         #
@@ -118,25 +124,25 @@ class Penny(Source):
     
     def model_depth(self,x,y,z,xcen,ycen,d,P,a,mu=1e10,nu=0.25):
         """
-        Calculates surface deformation based on point pressure source
+        Calculates deformation at depth based on pressurized penny-shaped crack
         References: Fialko
 
-        Args:
-        ------------------
-        x: x-coordinate grid (m)
-        y: y-coordinate grid (m)
-
-        Kwargs:
-        -----------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        dV: change in volume (m^3)
-        nu: poisson's ratio for medium
+        Parameters:
+            x: x-coordinate grid (m)
+            y: y-coordinate grid (m)
+            z: z-coordinate grid (m)
+            xcen: x-offset of penny-shaped crack (m)
+            ycen: y-offset of penny-shaped crack (m)
+            d: depth to penny-shaped crack (m)
+            P: pressure (Pa)
+            a: radius penny-shaped crack (Pa)
+            mu: shear modulus (Pa)
+            nu: poisson's ratio for medium
 
         Returns:
-        -------
-        (ux, uy, uz)
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
         """
         P_G=P/mu
 
@@ -153,15 +159,15 @@ class Penny(Source):
         h  = d / rd
         r  = np.sqrt(x ** 2 + y ** 2)
 
-        csi1,w1 = util.gauleg(eps,10,41)
-        csi2,w2 = util.gauleg(10,60,41)
+        csi1,w1 = self.gauleg(eps,10,41)
+        csi2,w2 = self.gauleg(10,60,41)
         csi     = np.concatenate((csi1,csi2))
         wcsi    = np.concatenate((w1,w2))
 
         if csi.shape[0] == 1:
             csi=csi.T
 
-        phi1,psi1,t,wt=util.psi_phi(h)
+        phi1,psi1,t,wt=self.psi_phi(h)
 
         phi=np.matmul(np.sin(np.outer(csi,t)) , phi1*wt)
         psi=np.matmul(np.divide(np.sin(np.outer(csi,t)), np.outer(csi,t)) - np.cos(np.outer(csi,t)),psi1*wt)
@@ -184,41 +190,79 @@ class Penny(Source):
         uz = -rd * P_G * Uz
 
         return np.array([ux,uy,uz])
+
+    def psi_phi(self,h):
+        """
+        Auxiliary function for the Fialko (2001) model
+        """
+        t,w=self.gauleg(0,1,41)
+        t=np.array(t)
+        g=-2.0*t/np.pi
+        d=np.concatenate((g,np.zeros(g.size)))
+        T1,T2,T3,T4=self.giveT(h,t,t)
+        T1p=np.zeros(T1.shape)
+        T2p=np.zeros(T1.shape)
+        T3p=np.zeros(T1.shape)
+        T4p=np.zeros(T1.shape)
+        N=t.size
+        for j in range(N):
+            T1p[:,j]=w[j]*T1[:,j]
+            T2p[:,j]=w[j]*T2[:,j]
+            T3p[:,j]=w[j]*T3[:,j]
+            T4p[:,j]=w[j]*T4[:,j]
+        M1=np.concatenate((T1p,T3p),axis=1)
+        M2=np.concatenate((T4p,T2p),axis=1)
+        Kp=np.concatenate((M1,M2),axis=0)
+        y=np.matmul(np.linalg.inv(np.eye(2*N,2*N)-(2/np.pi)*Kp),d)
+        phi=y[0:N]
+        psi=y[N:2*N]
+        return phi,psi,t,w
+
+    def giveP(self,h,x):
+        """
+        Auxiliary function for the Fialko (2001) model
+        """
+        P=np.zeros((4,x.size))
+        P[0]=(12*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),3)
+        P[1] = np.log(4*np.power(h,2)+np.power(x,2)) + (8*np.power(h,4)+2*np.power(x,2)*np.power(h,2)-np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),2)
+        P[2] = 2*(8*np.power(h,4)-2*np.power(x,2)*np.power(h,2)+np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),3)
+        P[3] = (4*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),2)
+        return P
+
+    def giveT(self,h,t,r):
+        """
+        Auxiliary function for the Fialko (2001) model
+        """
+        M = t.size
+        N = r.size
+        T1 = np.zeros((M,N)) 
+        T2 = np.zeros((M,N)) 
+        T3 = np.zeros((M,N))
+        for i in range(M):
+            Pm=self.giveP(h,t[i]-r)
+            Pp=self.giveP(h,t[i]+r)
+            T1[i] = 4*np.power(h,3)*(Pm[0,:]-Pp[0,:])
+            T2[i] = (h/(t[i]*r))*(Pm[1,:]-Pp[1,:]) +h*(Pm[2,:]+Pp[2,:])
+            T3[i] = (np.power(h,2)/r)*(Pm[3,:]-Pp[3,:]-2*r*((t[i]-r)*Pm[0,:]+(t[i]+r)*Pp[0,:]))
+        T4=np.copy(T3.T)
+        return T1,T2,T3,T4
     
-    def dP2dV(self, P_G,z0,a,nu=0.25):
-        h=z0 / a
-        phi,psi,t,wt=util.psi_phi(h)
-        print(phi.shape,psi.shape,t.shape,wt.shape)
-        dV= -4 * np.pi * (1 - nu) * P_G *a**3 * (t * (wt.T.dot(phi)))
-        return dV
-
-    def verify():
-        from data import Data
-        import matplotlib.pyplot as plt        
-        
-        x0=0
-        y0=0
-        z0=1000
-        P_G=0.01
-        a=1000
-        x=np.arange(-5000,5001,100)
-        y=np.arange(-5000,5001,100)
-
-        d = Data()
-        d.add_locs(x,y)
-
-        penny = Penny(d)
-
-        u,v,w=penny.forward(x0,y0,z0,P_G,a)
-
-        plt.figure()
-        plt.plot(x,u,c='red',label='u')
-
-        plt.figure()
-        plt.plot(y,v,c='red',label='v')
-
-        plt.figure()
-        plt.plot(y,w,c='red',label='w')
-
-        plt.show()
-
+    def gauleg(self,a,b,n):
+        """
+        Auxiliary function for the Fialko (2001) model
+        """
+        xs, cs = self.gauleg_params1(n)
+        coeffp = 0.5*(b+a) 
+        coeffm = 0.5*(b-a)
+        ts = coeffp - coeffm*xs
+        ws=cs*coeffm
+        #contribs = cs*f(ts)
+        #return coeffm*np.sum(contribs)
+        return ts[::-1],ws
+    
+    def gauleg_params1(self,n):
+        """
+        Auxiliary function for the Fialko (2001) model
+        """
+        xs,cs=np.polynomial.legendre.leggauss(n)
+        return xs,cs

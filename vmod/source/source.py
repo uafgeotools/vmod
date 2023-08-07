@@ -1,19 +1,19 @@
-"""
-Base class for analytical magmatic source models. Implements
-common functions required from all child classes.
-
-Author: Mario Angarita & Ronni Grapenthin, UAF
-Date: 11/10/2022
-
-
-TODO:
--add sphinx docstrings
-"""
 import numpy as np
 import scipy
 from ..data import Data
 
 class Source:
+    """
+    Base class for analytical magmatic source models. Implements
+    common functions required from all child classes.
+
+    Attributes
+        data (Data): data object
+        x0 (array): initial guess for parameter values
+        offsets (boolean): compute offsets as parameters for each component in the data object
+        low_bounds (array): lower limit for the parameter values
+        high_bounds (array): upper limit for the parameter values
+    """
     def __init__(self, data):
         self.data        = data
         self.x0          = None
@@ -23,6 +23,9 @@ class Source:
         self.high_bounds = []
         
     def add_offsets(self):
+        """
+        Add offsets as parameters for each component in the dara object
+        """
         if self.data.ts is None:
             self.offsets=True
             self.get_parnames()
@@ -30,9 +33,24 @@ class Source:
             raise Exception('The data has a time dependency')
         
     def bayesian_steps(self):
-        return None
+        """
+        Function that defines the number of steps for a bayesian inversion.
+        
+        Returns:
+            steps (int): Number of steps used in the bayesian inversions.
+            burnin (int): discarded number of steps at the begining of the inversion.
+            thin (int): number of steps per sample.
+        """
+        steps=1100000
+        burnin=100000
+        thin=1000
+        
+        return steps,burnin,thin
     
     def get_parnames(self):
+        """
+        Function that add offsets to the list of parameters.
+        """
         self.set_parnames()
         if self.offsets:
             for i,c in enumerate(self.data.comps):
@@ -40,30 +58,79 @@ class Source:
         return self.parameters
     
     def get_num_params(self):
+        """
+        Function that give the number of parameters.
+        
+        Returns:
+            size (int): length of the parameters.
+        """
         return len(self.parameters)
 
     def set_x0(self, x0):
+        """
+        Function that sets the initial guess for the model.
+        
+        Parameters:
+            x0 (list): list of values.
+        """
         self.get_parnames()
         self.x0 = x0
 
     def set_bounds(self, low_bounds, high_bounds):
+        """
+        Function that sets the low and upper bounds for the parameters.
+        
+        Parameters:
+            low_bounds (list): lower bounds for the parameters.
+            high_bounds (list): upper bounds for the parameters.
+        """
         self.get_parnames()
         self.low_bounds  = low_bounds
         self.high_bounds = high_bounds
 
     def get_xs(self):
+        """
+        Function that gives the data points positions in east.
+        
+        Returns:
+            xs (list): positions in east.
+        """
         return self.data.xs
 
     def get_ys(self):
+        """
+        Function that gives the data points positions in north.
+        
+        Returns:
+            ys (list): positions in north.
+        """
         return self.data.ys
 
     def get_ts(self):
+        """
+        Function that gives the times for the observations.
+        
+        Returns:
+            ts (list): times for the observations.
+        """
         return self.data.ts
     
     def get_zs(self):
+        """
+        Function that gives the data points positions in vertical.
+        
+        Returns:
+            zs (list): positions in vertical.
+        """
         return self.data.zs
     
     def get_orders(self):
+        """
+        Function that gives the orders for the parameters value.
+        
+        Returns:
+            orders (list): orders for the parameters.
+        """
         orders=[]
         for i in range(len(self.low_bounds)):
             order=int(np.log10(np.max([np.abs(self.low_bounds[i]),np.abs(self.high_bounds[i])])))-1
@@ -72,6 +139,17 @@ class Source:
         return orders
     
     def strain(self,x,y,args):
+        """
+        Function that computes stresses in the horizontal plane.
+        Parameters:
+            x: x-coordinate (m)
+            y: y-coordinate (m)
+            args: parameters for the model
+        Returns:
+            sxx (list): normal strain in the x direction.
+            syy (list): normal strain in the y direction.
+            sxy (list): horizontal shear strain.
+        """
         hx=0.001*np.abs(np.max(x)-np.min(x))
         hy=0.001*np.abs(np.max(y)-np.min(y))
         if hx==0:
@@ -104,6 +182,22 @@ class Source:
         return sxx,syy,sxy
         
     def stress(self, x, y, z, args):
+        """
+        Function that computes stresses in the horizontal plane.
+        
+        Parameters:
+            x: x-coordinate (m)
+            y: y-coordinate (m)
+            args: parameters for the model
+        
+        Returns:
+            sxx (list): normal stress in the x direction (Pa).
+            syy (list): normal stress in the y direction (Pa).
+            szz (list): normal stress in the z direction (Pa).
+            sxy (list): shear stress in the xy direction (Pa).
+            sxz (list): shear stress in the xz direction (Pa).
+            syz (list): shear stress in the yz direction (Pa).
+        """
         hx=0.001*np.abs(np.max(x)-np.min(x))
         hy=0.001*np.abs(np.max(y)-np.min(y))
         if hx==0:
@@ -159,9 +253,18 @@ class Source:
         sxz=(1+nu)*(dudz+dwdx)*mu
         syz=(1+nu)*(dvdz+dwdy)*mu
         
-        return x,u,v,w,sxx,syy,szz,sxy,sxz,syz
+        return sxx,syy,szz,sxy,sxz,syz
     
     def forward(self,args,unravel=True):
+        """
+        Function that computes the forward model.
+        
+        Parameters:
+            args: parameters for the model
+        
+        Returns:
+            output (list): output in certain datatype according to the data object.
+        """
         self.get_parnames()
         if self.offsets:
             offsets=args[-len(self.data.comps)::]

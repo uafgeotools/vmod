@@ -4,6 +4,17 @@ from . import Source
 from .okada import Okada
 
 class Regsill(Source):
+    """
+    Class to represent a regularized sill using dislocation patches from Okada (1985) model.
+
+    Attributes
+    ----------
+    parameters : array
+        names for the parameters in the model
+    typ : str
+        type of dislocation, open for tensile and slip for fault
+    ln : 
+    """
     def __init__(self, data, typ=None, ln=None, wn=None):
         if typ==None or typ=='open':
             self.typ='open'

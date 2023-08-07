@@ -1,18 +1,3 @@
-"""
-Functions for forward volcano-geodesy analytic models
-
-Author: Scott Henderson, Mario Angarita, Ronni Grapenthin
-Date: 9/30/2021
-
-Turned in object oriented code 22-jun-2021, Ronni Grapenthin
-
-TODO:
--benchmark codes against paper results
--test for georeferenced coordinate grids?
--add function to convert to los
--add sphinx docstrings
-"""
-
 import numpy as np
 from .. import util
 import scipy
@@ -20,14 +5,27 @@ from scipy.integrate import quad,quad_vec
 from . import Source
 
 class Mctigue(Source):
+    """
+    A class used to represent a spherical source using the McTigue (1987) implementation
 
+    Attributes
+    ----------
+    parameters : array
+        names for the parameters in the model
+    """
     def get_source_id(self):
+        """
+        The function defining the name for the model.
+          
+        Returns:
+            str: Name of the model.
+        """
         return "Mctigue"
     
-    def time_dependent(self):
-        return False
-    
     def bayesian_steps(self):
+        """
+        Function that defines the number of steps for a bayesian inversion.
+        """
         steps=1100000
         burnin=10000
         thin=1000
@@ -35,6 +33,12 @@ class Mctigue(Source):
         return steps,burnin,thin
 
     def print_model(self, x):
+        """
+        The function prints the parameters for the model.
+        
+        Parameters:
+           x (list): Parameters for the model.
+        """
         print("Mctigue")
         print("\tx = %f" % x[0])
         print("\ty = %f" % x[1])
@@ -43,6 +47,9 @@ class Mctigue(Source):
         print("\tdV= %f" % x[4])
     
     def set_parnames(self):
+        """
+        Function defining the names for the parameters in the model.
+        """
         self.parameters=("xcen","ycen","depth","radius","dV")
     
     # =====================
@@ -50,28 +57,25 @@ class Mctigue(Source):
     # =====================
     
     def model(self, x, y, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
-       
         """
-        3d displacement field from dislocation point source (McTigue, 1987)
-        Caution: analysis done in non-dimensional units!
-        see also Segall Ch7 p207
-        Same as forward, except change in pressure and chamber radius are specified
+        3d displacement field on surface from spherical source (McTigue, 1987)
 
-        Keyword arguments:
-        ------------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        rad: chamber radius (m)
-        dV: change in volume (m^3)
-        dP: change in pressure (Pa)
-        nu: poisson's ratio for medium
-        mu: shear modulus for medium (Pa)
-        order: highest order term to include (up to 2)
-        output: 'cart' (cartesian), 'cyl' (cylindrical)
-
-        Set terms=1 to reduce to Mogi Solution
-        NOTE: eps**6 term only significant if eps > 0.5
+        Parameters:
+            x: x-coordinate for displacement (m)
+            y: y-coordinate for displacement (m)
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            d: depth to point (m)
+            rad: chamber radius (m)
+            dV: change in volume (m^3)
+            dP: change in pressure (Pa)
+            nu: poisson's ratio for medium (default 0.25)
+            mu: shear modulus for medium (Pa) (default 4e9)
+        
+        Returns:
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
         """
         # center coordinate grid on point source
         x = x - xcen
@@ -111,26 +115,25 @@ class Mctigue(Source):
     
     def model_tilt(self, x, y, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
         """
-        Tilt displacement field from dislocation point source (McTigue, 1987)
-        Caution: analysis done in non-dimensional units!
-        see also Segall Ch7 p207
-        Same as forward, except change in pressure and chamber radius are specified
+        Tilt displacement field from spherical source (McTigue, 1987)
 
-        Keyword arguments:
-        ------------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        rad: chamber radius (m)
-        dV: change in volume (m^3)
-        dP: change in pressure (Pa)
-        nu: poisson's ratio for medium
-        mu: shear modulus for medium (Pa)
-        order: highest order term to include (up to 2)
-        output: 'cart' (cartesian), 'cyl' (cylindrical)
+        Parameters:
+            x: x-coordinate for displacement (m)
+            y: y-coordinate for displacement (m)
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            d: depth to point (m)
+            rad: chamber radius (m)
+            dV: change in volume (m^3)
+            dP: change in pressure (Pa)
+            nu: poisson's ratio for medium
+            mu: shear modulus for medium (Pa)
+            order: highest order term to include (up to 2)
+            output: 'cart' (cartesian), 'cyl' (cylindrical)
 
-        Set terms=1 to reduce to Mogi Solution
-        NOTE: eps**6 term only significant if eps > 0.5
+        Returns:
+            dx (array) : inclination in the x-axis in radians.
+            dy (array) : inclination in the y-axis in radians.
         """
         # center coordinate grid on point source
         x = x - xcen
@@ -171,28 +174,26 @@ class Mctigue(Source):
         return dx, dy
     
     def model_depth(self, x, y, z, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
-       
         """
-        3d displacement field from dislocation point source (McTigue, 1987)
-        Caution: analysis done in non-dimensional units!
-        see also Segall Ch7 p207
-        Same as forward, except change in pressure and chamber radius are specified
+        3d displacement field at depth from dislocation point source (McTigue, 1987)
 
-        Keyword arguments:
-        ------------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        rad: chamber radius (m)
-        dV: change in volume (m^3)
-        dP: change in pressure (Pa)
-        nu: poisson's ratio for medium
-        mu: shear modulus for medium (Pa)
-        order: highest order term to include (up to 2)
-        output: 'cart' (cartesian), 'cyl' (cylindrical)
-
-        Set terms=1 to reduce to Mogi Solution
-        NOTE: eps**6 term only significant if eps > 0.5
+        Parameters:
+            x: x-coordinate for displacement (m)
+            y: y-coordinate for displacement (m)
+            z: z-coordinate for displacement (m)
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            d: depth to point (m)
+            rad: chamber radius (m)
+            dV: change in volume (m^3)
+            dP: change in pressure (Pa)
+            nu: poisson's ratio for medium (default 0.25)
+            mu: shear modulus for medium (Pa) (default 4e9)
+        
+        Returns:
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
         """
         # center coordinate grid on point source
         x = x - xcen
@@ -253,6 +254,27 @@ class Mctigue(Source):
         return ux, uy, uz
     
     def stress(self, x, y, z, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
+        """
+        Stress field at depth from dislocation point source (McTigue, 1987)
+
+        Parameters:
+            x: x-coordinate for displacement (m)
+            y: y-coordinate for displacement (m)
+            z: z-coordinate for displacement (m)
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            d: depth to point (m)
+            rad: chamber radius (m)
+            dV: change in volume (m^3)
+            dP: change in pressure (Pa)
+            nu: poisson's ratio for medium (default 0.25)
+            mu: shear modulus for medium (Pa) (default 4e9)
+        
+        Returns:
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
+        """
         hx=0.001*np.abs(np.max(x)-np.min(x))
         hy=0.001*np.abs(np.max(y)-np.min(y))
         if hx==0:
@@ -261,7 +283,7 @@ class Mctigue(Source):
             h=hx
         elif hx<hy:
             h=hx
-        elif hy<hx:
+        else:
             h=hy
             
         u,v,w=self.model_depth(x, y, z, xcen, ycen, d, rad, dV, nu=nu, mu=mu)
@@ -307,6 +329,9 @@ class Mctigue(Source):
         return np.c_[x,u,v,w,sxx,syy,szz,sxy,sxz,syz]
     
     def auz1(self,nu,r,zeta):
+        """
+        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
+        """
         R=np.sqrt(r**2+zeta**2)
         sigma=lambda tt: 0.5*tt*np.exp(-tt)
         a7=lambda tt: 0.5*sigma(tt)*(2*(1-nu)-tt*zeta)*np.exp(tt*zeta)*scipy.special.jv(0, tt*R)
@@ -315,6 +340,9 @@ class Mctigue(Source):
         return quad_vec(duz,0,50)[0]
     
     def auz6(self,nu,r,zeta):
+        """
+        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
+        """
         R=np.sqrt(r**2+zeta**2)
         sigma=lambda tt: 1.5*(tt+tt**2)*np.exp(-tt)/(7-5*nu)
         tau=lambda tt: tt**2*np.exp(-tt)/(7-5*nu)
@@ -324,6 +352,9 @@ class Mctigue(Source):
         return quad_vec(duz,0,50)[0]
     
     def aur1(self,nu,r,zeta):
+        """
+        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
+        """
         aur=r*np.nan
         R=r
         sigma=lambda tt: 0.5*tt*np.exp(-tt)
@@ -333,6 +364,9 @@ class Mctigue(Source):
         return quad_vec(dur,0,50)[0]
     
     def aur6(self,nu,r,zeta):
+        """
+        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
+        """
         aur=r*np.nan
         R=r
         sigma=lambda tt: (tt**2)*np.exp(-tt)/(7-5*nu)

@@ -4,6 +4,24 @@ from . import Source
 from .okada import Okada
 
 class CRFault(Source):
+    """
+    A class used to represent a Caldera Ring Fault model
+
+    ...
+
+    Attributes
+    ----------
+    data : Data
+        Data object used as input
+    parameters : array
+        names for the parameters in the model
+    ori : int
+        orientation for the slip patches in the caldera ring fault, ori=1 for caldera uplift, ori=-1 for caldera collapse (default 1)
+    lw : int
+        number of patches in the vertical orientation
+    segs : int
+        number of horizontal segments (default 6)
+    """
     def __init__(self, data, ori=None, segs=None, lw=None):
         if lw==None:
             self.lw=1
@@ -23,12 +41,21 @@ class CRFault(Source):
         super().__init__(data)
     
     def get_source_id(self):
+        """
+        The function defining the name for the model.
+          
+        Returns:
+            str: Name of the model.
+        """
         return "CFRing"
-    
-    def time_dependent(self):
-        return False
 
     def print_model(self, x):
+        """
+        The function prints the parameters for the model.
+        
+        Parameters:
+           x (list): Parameters for the model.
+        """
         print("CFRing")
         print("\tx = %f" % x[0])
         print("\ty = %f" % x[1])
@@ -41,17 +68,33 @@ class CRFault(Source):
         print("\tstrike= %f" % x[8])
         
     def set_parnames(self):
+        """
+        Function defining the names for the parameters in the model.
+        """
         self.parameters=("xcen","ycen","depth","slip","opening","smajor","sminor","width","strike")
 
     # =====================
     # Forward Models
     # =====================
     def get_parameters(self,xcen,ycen,a,b,strike):
+        """
+        Function defining parameters for the patches that compose the caldera ring fault.
+        
+        Parameters:
+           xcen (float) : x coordinate for the center of the caldera in meters.
+           ycen (float) : y coordinate for the center of the caldera in meters.
+           a (float) : semimajor axis for the caldera.
+           b (float) : semiminor axis for the caldera.
+           strike (deg) : azimuth for the caldera clockwise is positive from North.
+        
+        Returns:
+            params (array) : Matrix where each column has the parameters for an Okada patch.
+        """
         angles=np.linspace(0,360,self.segs+1)
         params=np.ones((len(angles)-1,8))
         for i,angle in enumerate(angles[1::]):
             pangle=angles[i]
-            print(pangle,angle)
+            #print(pangle,angle)
             xc1 = a*np.cos(np.radians(pangle))*np.cos(np.radians(90-strike)) -\
                  b*np.sin(np.radians(pangle))*np.sin(np.radians(90-strike)) + xcen
             yc1 = a*np.cos(np.radians(pangle))*np.sin(np.radians(90-strike)) +\
@@ -77,6 +120,21 @@ class CRFault(Source):
         return params
     
     def get_greens(self,x,y, xcen, ycen, depth, a, b, width, strike):
+        """
+        Green functions for the caldera ring fault.
+        
+        Parameters:
+           xcen (float) : x coordinate for the center of the caldera in meters.
+           ycen (float) : y coordinate for the center of the caldera in meters.
+           depth (float) : depth for the Okada patches.
+           width (float) : vertical width for the Okada patches.
+           a (float) : semimajor axis for the caldera.
+           b (float) : semiminor axis for the caldera.
+           strike (deg) : azimuth for the caldera clockwise is positive from North.
+        
+        Returns:
+            G (array) : G-Matrix containing the green functions.
+        """
         if self.ori==1:
             rake=90.0
         else:
@@ -109,30 +167,23 @@ class CRFault(Source):
         
     def model(self,x,y, xcen, ycen, depth, slip, opening, a, b, width, strike):       
         """
-        Calculates surface deformation based on point pressure source
-        References: Mogi 1958, Segall 2010 p.203
-
-        Args:
-        ------------------
-        x: x-coordinate grid (m)
-        y: y-coordinate grid (m)
-
-        Kwargs:
-        -----------------
-        xcen: y-offset of point source epicenter (m)
-        ycen: y-offset of point source epicenter (m)
-        d: depth to point (m)
-        dV: change in volume (m^3)
-        nu: poisson's ratio for medium
-
+        Green functions for the caldera ring fault.
+        
+        Parameters:
+           xcen (float) : x coordinate for the center of the caldera in meters.
+           ycen (float) : y coordinate for the center of the caldera in meters.
+           depth (float) : depth for the Okada patches.
+           slip (float) : slip in the Okada patches in meters.
+           opening (float) : opening in the Okada patches in meters.
+           a (float) : semimajor axis for the caldera.
+           b (float) : semiminor axis for the caldera.
+           width (float) : vertical width for the Okada patches.
+           strike (deg) : azimuth for the caldera clockwise is positive from North.
+        
         Returns:
-        -------
-        (ux, uy, uz)
-
-
-        Examples:
-        --------
-
+            ux (array) : displacements in east in meters.
+            uy (array) : displacements in north in meters.
+            uz (array) : displacements in vertical in meters.
         """
         if isinstance(slip,(list,np.ndarray)):
             if not len(slip)==self.segs*self.lw:

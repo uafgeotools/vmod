@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-General utility functions to accompany vmodels (mogi, yang, okada...)
-Created on Tue Jun 21 14:59:15 2016
-
-@author: scott
+General utility functions to accompany vmod
 """
 import numpy as np
 import numpy.ma as ma
@@ -24,414 +21,56 @@ from scipy.interpolate import interp1d
 from global_land_mask import globe
 from skimage.restoration import denoise_nl_means, estimate_sigma
 
-def psi_phi(h):
-    t,w=gauleg(0,1,41)
-    t=np.array(t)
-    g=-2.0*t/np.pi
-    d=np.concatenate((g,np.zeros(g.size)))
-    T1,T2,T3,T4=giveT(h,t,t)
-    T1p=np.zeros(T1.shape)
-    T2p=np.zeros(T1.shape)
-    T3p=np.zeros(T1.shape)
-    T4p=np.zeros(T1.shape)
-    N=t.size
-    for j in range(N):
-        T1p[:,j]=w[j]*T1[:,j]
-        T2p[:,j]=w[j]*T2[:,j]
-        T3p[:,j]=w[j]*T3[:,j]
-        T4p[:,j]=w[j]*T4[:,j]
-    M1=np.concatenate((T1p,T3p),axis=1)
-    M2=np.concatenate((T4p,T2p),axis=1)
-    Kp=np.concatenate((M1,M2),axis=0)
-    y=np.matmul(np.linalg.inv(np.eye(2*N,2*N)-(2/np.pi)*Kp),d)
-    phi=y[0:N]
-    psi=y[N:2*N]
-    return phi,psi,t,w
-
-def giveP(h,x):
-    P=np.zeros((4,x.size))
-    P[0]=(12*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),3)
-    P[1] = np.log(4*np.power(h,2)+np.power(x,2)) + (8*np.power(h,4)+2*np.power(x,2)*np.power(h,2)-np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),2)
-    P[2] = 2*(8*np.power(h,4)-2*np.power(x,2)*np.power(h,2)+np.power(x,4))/np.power(4*np.power(h,2)+np.power(x,2),3)
-    P[3] = (4*np.power(h,2)-np.power(x,2))/np.power((4*np.power(h,2)+np.power(x,2)),2)
-    return P
-
-def giveT(h,t,r):
-    M = t.size
-    N = r.size
-    T1 = np.zeros((M,N)) 
-    T2 = np.zeros((M,N)) 
-    T3 = np.zeros((M,N))
-    for i in range(M):
-        Pm=giveP(h,t[i]-r)
-        Pp=giveP(h,t[i]+r)
-        T1[i] = 4*np.power(h,3)*(Pm[0,:]-Pp[0,:])
-        T2[i] = (h/(t[i]*r))*(Pm[1,:]-Pp[1,:]) +h*(Pm[2,:]+Pp[2,:])
-        T3[i] = (np.power(h,2)/r)*(Pm[3,:]-Pp[3,:]-2*r*((t[i]-r)*Pm[0,:]+(t[i]+r)*Pp[0,:]))
-    T4=np.copy(T3.T)
-    return T1,T2,T3,T4
-
-def legpol(x,N):
-    dim=x.size
-    if not dim==1:
-        dP=np.zeros((N,dim))
-        P=np.zeros((N+1,dim))
-        P[0]=np.ones(dim)
-    else:
-        dP=np.zeros(N)
-        P=np.zeros(N+1)
-        P[0]=1.0
-    P[1]=x
-    for j in range(1,N):
-        P[j+1] = ((2*j+1)*x*P[j] - j*P[j-1])/(j+1)
-        dP[j] = j*(x*P[j] - P[j-1])/(np.power(x,2)-1)
-    return P[N-1],dP[N-1]
-
-def legendre(n,x):
-    if n==0:
-        val2 = 1.
-        dval2 = 0.
-    elif n==1:
-        val2 = x
-        dval2 = 1.
-    else:
-        val0 = 1.; val1 = x
-        for j in range(1,n):
-            val2 = ((2*j+1)*x*val1 - j*val0)/(j+1)
-            val0, val1 = val1, val2
-        dval2 = n*(val0-x*val1)/(1.-x**2)
-    return val2, dval2
-
-def legnewton(n,xold,kmax=200,tol=1.e-8):
-    for k in range(1,kmax):
-        val, dval = legendre(n,xold)
-        xnew = xold - val/dval
-
-        xdiff = xnew - xold
-        if abs(xdiff/xnew) < tol:
-            break
-
-        xold = xnew
-    else:
-        xnew = None
-    return xnew
-
-def legroots(n):
-    roots = np.zeros(n)
-    npos = n//2
-    for i in range(npos):
-        xold = np.cos(np.pi*(4*i+3)/(4*n+2))
-        root = legnewton(n,xold) 
-        roots[i] = -root
-        roots[-1-i] = root
-    return roots
-
-def gauleg_params(n):
-    xs = legroots(n)
-    cs = 2/((1-xs**2)*legendre(n,xs)[1]**2)
-    return xs, cs
-
-def gauleg(a,b,n):
-    xs, cs = gauleg_params1(n)
-    coeffp = 0.5*(b+a) 
-    coeffm = 0.5*(b-a)
-    ts = coeffp - coeffm*xs
-    ws=cs*coeffm
-    #contribs = cs*f(ts)
-    #return coeffm*np.sum(contribs)
-    return ts[::-1],ws
-
-'''
-def gauleg(x1,x2,N):
-    eps=1e-8
-    z=np.zeros(N)
-    xm = 0.5*(x2+x1)
-    xl = 0.5*(x2-x1)
-    for n in range(N):
-        z[n] = np.cos(np.pi*((n+1)-0.25)/(N+0.5))
-        z1 = 100*z[n]
-        while np.abs(z1-z[n])>eps:
-            pN,dpN=legpol(z[n],N+1)
-            z1=z[n]
-            z[n]=z1-pN/dpN
-    pN,dpN=legpol(z,N+1)
-    x=xm-xl*z
-    w = 2*xl/((1-np.power(z,2))*np.power(dpN,2))
-    return x,w
-'''
-
-def gauleg_params1(n):
-    xs,cs=np.polynomial.legendre.leggauss(n)
-    return xs,cs
-
-def f(x):
-    return 1/np.sqrt(x**2 + 1)
-
-def world2rc(x,y,affine, inverse=False):
-    '''
-    World coordinates (lon,lat) to image (row,col) center pixel coordinates
-    '''
-    import rasterio
-    #NOTE: src.xy() does this I think...
-    #T0 = src.meta['affine']
-    T0 = affine
-    T1 = T0 * rasterio.Affine.translation(0.5, 0.5)
-    rc2xy = lambda r, c: (c, r) * T1
-    # can probable simpligy,,, also int() acts like floor()
-    xy2rc = lambda x, y: [int(i) for i in [x, y] * ~T1][::-1]
-
-    if inverse:
-        return rc2xy(y,x)
-    else:
-        return xy2rc(x,y)
-
-
-def save_rasterio(path, data, profile):
-    '''
-    save single band raster file
-    intended to use with load_rasterio() to open georeferenced data manipulate
-    with numpy and then resave modified data
-    '''
-    import rasterio
-    with rasterio.drivers():
-        with rasterio.open(path, 'w', **profile) as dst:
-            dst.write(data, 1) #single band
-
-
-def load_rasterio(path):
-    '''
-    load single bad georeference data as 'f4', convert NoDATA to np.nan
-    not sure this works with 'scale' in vrt
-    '''
-    import rasterio
-    with rasterio.drivers():
-        with rasterio.open(path, 'r') as src:
-            data = src.read()
-            meta = src.profile
-            extent = src.bounds[::2] + src.bounds[1::2]
-
-    return data, extent, meta
-
-
-def load_cor_mask(path='phsig.cor.8alks_8rlks.geo.vrt', corthresh=0.1):
-    '''
-    load geocoded correlation file to use as mask
-    '''
-    import rasterio
-    cordata, extent, meta = load_rasterio(path)
-    cor = cordata[0]
-    # Geocoding seems to create outliers beyond realistic range (maybe interpolation)
-    ind_outliers = (np.abs(cor) > 1)
-    cor[ind_outliers] = 0.0
-    # Can go further and remove pixels with low coherence (or just set to 0.0)
-    mask = (cor < corthresh)
-    #data[mask] = np.nan
-
-    return mask
-
-
-def calc_ramp(array, ramp='quadratic', custom_mask=None):
-    '''
-    Remove a quadratic surface from the interferogram Subtracting
-    the best-fit quadratic surface forces the background mean surface
-    displacement to be zero
-
-    Note: exclude known signal, unwrapping errors, etc. with custom_mask
-
-    ramp = 'dc','linear','quadratic'
-
-    returns ramp
-    '''
-    X,Y = np.indices(array.shape)
-    x = X.reshape((-1,1))
-    y = Y.reshape((-1,1))
-
-    # Work with numpy mask array
-    phs = np.ma.masked_invalid(array)
-
-    if custom_mask != None:
-        phs[custom_mask] = ma.masked
-
-    d = phs.reshape((-1,1))
-    g = ~d.mask
-    dgood = d[g].reshape((-1,1))
-
-    if ramp == 'quadratic':
-        print('fit quadtratic surface')
-        G = np.concatenate([x, y, x*y, x**2, y**2, np.ones_like(x)], axis=1) #all pixels
-        Ggood = np.vstack([x[g], y[g], x[g]*y[g], x[g]**2, y[g]**2, np.ones_like(x[g])]).T
-        try:
-            m,resid,rank,s = np.linalg.lstsq(Ggood,dgood)
-        except ValueError as ex:
-            print('{}: Unable to fit ramp with np.linalg.lstsq'.format(ex))
-
-
-    elif ramp == 'linear':
-        print('fit linear surface')
-        G = np.concatenate([x, y, x*y, np.ones_like(x)], axis=1)
-        Ggood = np.vstack([x[g], y[g], x[g]*y[g], np.ones_like(x[g])]).T
-        try:
-            m,resid,rank,s = np.linalg.lstsq(Ggood,dgood)
-        except ValueError as ex:
-            print('{}: Unable to fit ramp with np.linalg.lstsq'.format(ex))
-
-    elif ramp == 'dc':
-        G = np.ones_like(array)
-        m = np.mean(phs)
-        print('fit dc offset')
-
-    ramp = np.dot(G,m)
-    ramp = ramp.reshape(phs.shape)
-
-    return ramp
-
-def get_enu2los(enuFile='enu.rdr.geo'):
-    '''
-    Get conversion of cartesian ground displacements to radar LOS
-
-    To avoid incidence and heading convention issues, assume 3 band GDAL file with
-    conversion factors. Convension used is RECENT MASTER - OLDER SLAVE such that
-    positive phase in interferogram is uplift.
-
-    Example:
-    model = np.array([ux,uy,uz])
-    enu2los = get_enu2los('enu.rdr.geo')
-    dlos = model*enu2los
-
-    To generate this file with ISCE:
-    imageMath.py --eval='sin(rad(a_0))*cos(rad(a_1+90)); sin(rad(a_0)) * sin(rad(a_1+90)); cos(rad(a_0))' --a=los.rdr.geo -t FLOAT -s BIL -o enu.rdr.geo
-    imageMath.py --eval='a_0*b_0;a_1*b_1;a_2*b_2' --a=enu.rdr.geo --b=model.geo -t FLOAT -o model_LOS.geo
-    '''
-    import rasterio
-    data,junk,junk = load_rasterio(enuFile)
-    data[data==0] = np.nan
-    e2los,n2los,u2los = data
-    # NOTE: some sort of bug in conversion code why is there z=1 in z2los
-    u2los[u2los==1] = np.nan
-
-    cart2los = np.dstack([e2los, n2los, u2los])
-    return cart2los
-
-
-def get_cart2los(incidence,heading):
-    '''
-    coefficients for projecting cartesian displacements into LOS vector
-    assuming convention of Hannsen text figure 5.1 where angles are clockwise +
-    relative to north!
-    is Azimuth look direction (ALD=heading-270)
-    vm.util.get_cart2los(23,190)
-
-    ISCE descending los file has heading=-100
-    '''
-    incidence = np.deg2rad(incidence)
-    ALD = np.deg2rad(heading-270)
-
-    EW2los = -np.sin(ALD) * np.sin(incidence)
-    NS2los = -np.cos(ALD) * np.sin(incidence)
-    Z2los = np.cos(incidence)
-
-    cart2los = np.dstack([EW2los, NS2los, Z2los])
-
-    return cart2los
-
-
 
 def cart2pol(x1,x2):
+    """
+    Converts cartesian coordinates to polar coordinates
+    
+    Parameters:
+        x1 (float): x-coordinate (m)
+        x2 (float): y-coordinate (m)
+        
+    Returns:
+        theta (float): polar angle (radians)
+        r (float): polar radius (m)
+    """
     #theta = np.arctan(x2/x1)
     theta = np.arctan2(x2,x1) #sign matters -SH
     r = np.sqrt(x1**2 + x2**2)
     return theta, r
 
 def pol2cart(theta,r):
+    """
+    Converts polar coordinates to cartesian coordinates
+    
+    Parameters:
+        theta (float): polar angle (radians)
+        r (float): polar radius (m)
+        
+    Returns:
+        x1 (float): x-coordinate (m)
+        x2 (float): y-coordinate (m)
+    """
     x1 = r * np.cos(theta)
     x2 = r * np.sin(theta)
     return x1,x2
-
-def shift_utm(X,Y,xcen,ycen):
-    '''
-    Avoid large numbers in UTM grid by creating local (0,0) origin
-    '''
-    x0 = X.min()
-    y0 = Y.min()
-
-    X = X - x0
-    Y = Y - y0
-    xcen = xcen - x0
-    ycen = ycen - y0
-
-    return X,Y,xcen,ycen
-
-
-def get_cart2los_bak(inc, ald, x):
-    '''
-    NOTE: possible sign convention issues with this function...
-    '''
-    # x is data array
-    # converted to LOS
-    # los = data.dot(cart2los) * 1e2 # maybe use numpy.tensordot? not sure...
-    # For now fake it:
-    look = np.deg2rad(inc) * np.ones_like(x)  # incidence
-    # heading (degreees clockwise from north)
-    head = np.deg2rad(ald) * np.ones_like(x)
-    # NOTE: matlab code default is -167 'clockwise from north' (same as hannsen text fig 5.1)
-    # This is for descending envisat beam 2, asizmuth look direction (ALD) is
-    # perpendicular to heading (-77)
-
-    # however, make_los.pl generates unw file with [Incidence, ALD], ALD for ascending data is 77
-    # make_los.pl defines "(alpha) azimuth pointing of s/c"
-    EW2los = np.sin(head) * np.sin(look)
-    NS2los = np.cos(head) * np.sin(look)
-    Z2los = -np.cos(look)
-    # NOTE: negative here implies uplift=positive in LOS
-    cart2los = -np.dstack([EW2los, NS2los, Z2los])
-
-    return cart2los
-
-def write_rsc(los,az,lk,wl,extent,units):
-    stepx=(extent[1]-extent[0])/los.shape[1]
-    stepy=(extent[2]-extent[3])/los.shape[0]
-    if units=='m':
-        unit='meters'
-    elif units=='deg':
-        unit='degrees'
-    files=['vmod/varres/insar.unw.rsc','vmod/varres/incidence.unw.rsc']
-    for archivo in files:
-        rsc=open(archivo,'w')
-        rsc.write('FILE_LENGTH '+str(los.shape[0])+'\n')
-        rsc.write('WIDTH '+str(los.shape[1])+'\n')
-        rsc.write('X_FIRST '+str(extent[0])+'\n')
-        rsc.write('X_STEP '+str(stepx)+'\n')
-        rsc.write('X_UNIT '+unit+'\n')
-        rsc.write('Y_FIRST '+str(extent[3])+'\n')
-        rsc.write('Y_STEP '+str(stepy)+'\n')
-        rsc.write('Y_UNIT '+unit+'\n')
-        rsc.write('WAVELENGTH '+str(wl))
-        rsc.close()
-
-def write_unw(los,az,lk):
-    nxx=los.reshape(los.shape).shape[1]
-    nyy=los.reshape(los.shape).shape[0]
-    amp=np.ones((nyy,nxx),dtype=np.float32)
-    inp=np.zeros((nyy,2*nxx),dtype=np.float32)
-    inp[:,0:nxx]=amp
-    inp[:,nxx:]=los
-    archivo=open('vmod/varres/insar.unw','wb')
-    inp.tofile(archivo)
-    archivo.close()
-    if isinstance(az,float):
-        inp[:,0:nxx]=amp*(az)
-    else:
-        inp[:,0:nxx]=az
-    if isinstance(lk,float):
-        inp[:,0:nxx]=amp*(lk)
-    else:
-        inp[:,0:nxx]=lk
-    inp=inp.astype(np.float32)
-    archivo=open('vmod/varres/incidence.unw','wb')
-    inp.tofile(archivo)
-    archivo.close()
     
 def ll2utm(lons,lats,z1=None,z2=None):
+    """
+    Projects lon/lat coordinates using certain utm zone
+    
+    Parameters:
+        lons (array): longitudes to be projected
+        lats (array): latitudes to be projected
+        z1 (str): utm zone number (optional)
+        z2 (str): utm zone letter (optional)
+    
+    Returns:
+        xs (array): projected x-coordinates
+        ys (array): projected y-coordinates
+        z1 (str): utm zone number
+        z2 (str): utm zone letter
+    """
     xs,ys=[],[]
     for i in range(len(lats)):
         if z1 is None:
@@ -445,6 +84,19 @@ def ll2utm(lons,lats,z1=None,z2=None):
     return xs,ys,z1,z2
 
 def utm2ll(xs,ys,z1,z2):
+    """
+    Converts utm coordinates into lon/lat
+    
+    Parameters:
+        xs (array): projected x-coordinates to be converted
+        ys (array): projected y-coordinates to be converted
+        z1 (str): utm zone number
+        z2 (str): utm zone letter
+    
+    Returns:
+        lons (array): converted longitudes
+        lats (array): converted latitudes
+    """
     lons,lats=[],[]
     for i in range(len(xs)):
         lat,lon=utm.to_latlon(xs[i], ys[i], z1, z2)
@@ -455,101 +107,33 @@ def utm2ll(xs,ys,z1,z2):
     return lons,lats
 
 def get_quadtree(ref,az,lk,name='quadtree.txt',th=None):
+    """
+    Downsample an image that is inside a Ref_Selector object
+    
+    Parameters:
+        ref (Ref_Selector): Ref_Selector object that contains the image to be downsampled
+        az (array or float): interferogram azimuth angle clockwise from north (degrees)
+        lk (array or float): interferogram incidence angle (degrees)
+        name (str): csv filename for the output
+        th (float): variance threshold
+    """
     im=ref.dataset
     if th is None:
         th=np.nanvar(im)/50
     
     quadtree_var(im,az,lk,ref.extent,th,name)
 
-'''
-def get_quadtree(ref,az,lk,name='quadtree.txt',per=100):
-    get_quadtree2(ref,az,lk,per)
-    
-    
-    
-    archivo=open('./vmod/varres/newtest.txt','r')
-    lineas=archivo.readlines()
-    archivo.close()
-
-    lns,lts,cats=[],[],[]
-    for i,linea in enumerate(lineas[2::]):
-        lns.append(float(linea.split()[3]))
-        lts.append(float(linea.split()[4]))
-        cats.append(i)
-    lns=np.array(lns)
-    lts=np.array(lts)
-    cats=np.array(cats)
-    
-    lons=np.linspace(ref.extent[0],ref.extent[1],ref.dataset.shape[1])
-    lats=np.linspace(ref.extent[2],ref.extent[3],ref.dataset.shape[0])[::-1]
-    LATS,LONS=np.meshgrid(lons,lats)
-    
-    quadobs=np.empty(ref.dataset.shape)
-    quadobs[:,:]=np.nan
-    for i in range(len(lons)):
-        for j in range(len(lats)):
-            minn=np.argmin((lns-lons[i])**2+(lts-lats[j])**2)
-            quadobs[j,i]=cats[minn]
-    quadobs[np.isnan(ref.dataset)]=np.nan
-            
-    result=open(name,'w')
-    result.write('%Reference (Lon,Lat): '+str(ref.xref)+','+str(ref.yref)+'\n')
-    for i in range(len(cats)):
-        cond=quadobs==cats[i]
-        nrows=5
-        ncols=5
-        inrow=int((nrows-1)/2)
-        incol=int((ncols-1)/2)
-        if len(ref.dataset[cond])<ncols*nrows:
-            std=0
-            while(std==0):
-                rows,cols=np.nonzero(cond)
-                row,col=rows[0],cols[0]
-                if row-nrows<0:
-                    row=int((nrows-1)/2)
-                elif row+nrows>=quadobs.shape[0]:
-                    row=(quadobs.shape[0]-1)-int((nrows-1)/2)
-                if col-ncols<0:
-                    col=int((ncols-1)/2)
-                elif col+ncols>=quadobs.shape[1]:
-                    col=(quadobs.shape[1]-1)-int((ncols-1)/2)
-
-                value=np.nanmedian(ref.dataset[row-inrow:row+inrow,col-incol:col+incol])
-                std=np.nanstd(ref.dataset[row-inrow:row+inrow,col-incol:col+incol])
-                nrows=2*nrows+1
-                ncols=2*ncols+1
-                inrow=int((nrows-1)/2)
-                incol=int((ncols-1)/2)
-        else:
-            value=np.nanmedian(ref.dataset[cond])
-            std=np.nanstd(ref.dataset[cond])
-        lon=lns[i]
-        lat=lts[i]
-        azm=np.mean(az[cond])
-        inc=np.mean(lk[cond])
-        wgt=np.sum(quadobs==cats[i])
-        if std==0:
-            print('std=0',i,wgt)
-        elif std/float(wgt)<1e-9:
-            print('stdw',i,std,wgt)
-        
-        line="%3.6f %3.6f %1.6f %1.6f %1.6f %1.9f\n"\
-            % (lon,lat,azm,inc,value,std/float(wgt))
-        
-        result.write(line)
-    result.close()
-
-def rewrite_csv(xs,ys,azs,lks,los,elos,ref,name='output.txt'):
-    result=open(name,'w')
-    result.write('%Reference (Lon,Lat): '+str(ref[0])+','+str(ref[1])+'\n')
-    for i in range(len(xs)):
-        line="%3.6f %3.6f %1.6f %1.6f %1.6f %1.9f\n"\
-            % (xs[i],ys[i],azs[i],lks[i],los[i],elos[i])
-        result.write(line)
-    result.close()
-    rewrite_csv(self.los,[self.xref,self.yref],ori=csvfile,name=csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1])
-'''
 def rewrite_csv(los,ref,old,name='output.txt'):
+    """
+    Rewrites a csv file that contains the downsampled
+    interferogram and has changed the reference
+    
+    Parameters:
+        los (array): new line of sight data
+        ref (array): longitude and latitude for the reference pixel (degrees)
+        old (str): filename of the csvfile
+        name (str): new csv filename for the output
+    """
     archivo=open(old,'r')
     lines=archivo.readlines()
     archivo.close()
@@ -565,82 +149,20 @@ def rewrite_csv(los,ref,old,name='output.txt'):
         result.write(line)
     result.close()
 
-def get_quadtree2(ref,az,lk,per=100,th=1e-10,unit='deg',name='newtest'):
-    los=np.copy(ref.dataset)
-    los[np.isnan(los)]=0
-    extent=ref.extent
-    wl=ref.wl
-    
-    quadtree(los,az,lk,extent,per,unit,th,wl,name)
-
-def quadtree(los,az,lk,extent,per=100,unit='deg',th=1e-10,wl=1.0,name='newtest'):
-    eths=[np.log10(th)]
-    if not per==100:
-        eths=np.linspace(-8,0,9)[::-1]
-    
-    write_unw(los,az,lk)
-    write_rsc(los,az,lk,wl,extent,unit)
-    
-    ini=run_decompose(th)
-    
-    for i,eth in enumerate(eths):
-        th=10**eth
-        tam=run_decompose(th)
-        
-        if i==0:
-            an=tam
-            opt=ini*per/100
-            low=tam
-        if not i==0: 
-            if not an==tam:
-                anp=tam
-                if per/100<tam/ini:
-                    anp=run_decompose(10**eths[i-1])
-                    ths=np.sort(10**np.linspace(eths[i],eths[i-1],7))[::-1]
-                else:
-                    ths=np.sort(10**np.linspace(eths[i+1],eths[i],7))[::-1]
-                pers=[]
-                thts=[]
-                for j,th in enumerate(ths):
-                    anc=run_decompose(th)
-                    if anc not in [low,ini]:
-                        pers.append(anc/ini)
-                        thts.append(th)
-                
-                f2 = interp1d(pers, thts, kind='slinear')
-                optth=f2(per/100)
-                
-                if optth>0:
-                    anc=run_decompose(optth)
-                else:
-                    anc=np.inf
-                '''    
-                if not ((anc/ini-0.05)<=per/100 and (anc/ini+0.05)>=per/100):
-                    pos=np.argmin(np.abs(per/100-np.array(pers)))
-                    if pers[pos]>(per/100):
-                        if pos==0:
-                            nths=np.linspace(thts[pos]/10,thts[pos],5)
-                        else:
-                            nths=np.linspace(thts[pos-1],thts[pos],5)
-                    else:
-                        if pos==len(pers)-1:
-                            nths=np.linspace(thts[pos],thts[pos]*10,5)
-                        else:
-                            nths=np.linspace(thts[pos],thts[pos+1],5)
-                    for k,th in enumerate(nths):
-                        anc=run_decompose(th)
-                        if anc not in [low,ini]:
-                            pers.append(anc/ini)
-                            thts.append(th)
-                    print(pers,thts)
-                    f2 = interp1d(pers, thts, kind='cubic')
-                    optth=f2(per/100)
-                    anc=run_decompose(optth)
-                '''
-                return
-
-
 def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
+    """
+    Downsample an image (im) acoording to a variance threshold (th)
+    
+    Parameters:
+        im (array): image (represented by a matrix) to be downsampled
+        az (array or float): interferogram azimuth angle clockwise from north (degrees)
+        inc (array or float): interferogram incidence angle (degrees)
+        extent (array): array with the extent of the image (min_lon,max_lon,min_lat,max_lat)
+        th (float): variance threshold
+        name (str): filename for the output
+        ref (array): reference pixel (lon,lat)
+        denoise (boolean): if True a non-local means filter will be applied to the image
+    """
     patch_kw = dict(patch_size=5,      # 5x5 patches
                     patch_distance=15,  # 13x13 search area
                     multichannel=True)
@@ -664,6 +186,15 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     
     
     def quadtree_im(im,inverts,th):
+        """
+        Recurrent split function, if the image has a variance lower than th
+        the recurrence will stop
+        
+        Parameters:
+            im (array): image to be downsampled
+            inverts (array): upper left coordinates (row,col)
+            th (float): variance threshold
+        """
         #if im.shape[0]*im.shape[1]<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
         #if np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
         #if np.sum(np.isnan(im))<=10 or np.sum(np.isnan(im))>=0.9*im.shape[0]*im.shape[1] or np.nanvar(im)<=th:
@@ -708,6 +239,17 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     ar.close()
 
 def calc_std(mat,verts):
+    """
+    Calculates the standard deviation within a sub-matrix. If the std is 0, 
+    it makes the sub-matrix bigger
+    
+    Parameters:
+        mat (array): input matrix
+        verts (array): indexes to define the sub-matrix (min_row, max_row, min_col, max_col)
+        
+    Returns:
+        std (float): standard deviation of the submatrix
+    """
     std = np.nanstd(mat[verts[0]:verts[1],verts[2]:verts[3]]) / np.sum(np.logical_not(np.isnan(mat[verts[0]:verts[1],verts[2]:verts[3]])))
     
     if not std==0:
@@ -730,87 +272,19 @@ def calc_std(mat,verts):
         
     return calc_std(mat,newverts)
     
-    
-def mat2quad(los,az,lk,extent,name,per=100,wl=1.0,unit='deg',ref=None):
-    quadtree(los,az,lk,extent,per,unit,th=1e-10,wl=1.0,name='newtest')
-    archivo=open('./vmod/varres/newtest.txt','r')
-    lineas=archivo.readlines()
-    archivo.close()
-
-    lns,lts,cats=[],[],[]
-    for i,linea in enumerate(lineas[2::]):
-        lns.append(float(linea.split()[3]))
-        lts.append(float(linea.split()[4]))
-        cats.append(i)
-    lns=np.array(lns)
-    lts=np.array(lts)
-    cats=np.array(cats)
-    
-    lons=np.linspace(extent[0],extent[1],los.shape[1])
-    lats=np.linspace(extent[2],extent[3],los.shape[0])[::-1]
-    LATS,LONS=np.meshgrid(lons,lats)
-    
-    quadobs=np.empty(los.shape)
-    quadobs[:,:]=np.nan
-    for i in range(len(lons)):
-        for j in range(len(lats)):
-            minn=np.argmin((lns-lons[i])**2+(lts-lats[j])**2)
-            quadobs[j,i]=cats[minn]
-    quadobs[np.isnan(los)]=np.nan
-            
-    result=open(name,'w')
-    if unit=='deg' and ref is not None:
-        result.write('%Reference (Lon,Lat): '+str(ref[0])+','+str(ref[1])+'\n')
-    elif unit=='m' and ref is not None:
-        result.write('%Reference (x,y): '+str(ref[0])+','+str(ref[1])+'\n')
-    for i in range(len(cats)):
-        cond=quadobs==cats[i]
-        nrows=5
-        ncols=5
-        inrow=int((nrows-1)/2)
-        incol=int((ncols-1)/2)
-        if len(los[cond])<ncols*nrows:
-            std=0
-            while(std==0):
-                rows,cols=np.nonzero(cond)
-                row,col=rows[0],cols[0]
-                if row-nrows<0:
-                    row=int((nrows-1)/2)
-                elif row+nrows>=quadobs.shape[0]:
-                    row=(quadobs.shape[0]-1)-int((nrows-1)/2)
-                if col-ncols<0:
-                    col=int((ncols-1)/2)
-                elif col+ncols>=quadobs.shape[1]:
-                    col=(quadobs.shape[1]-1)-int((ncols-1)/2)
-
-                value=np.nanmedian(los[row-inrow:row+inrow,col-incol:col+incol])
-                std=np.nanstd(los[row-inrow:row+inrow,col-incol:col+incol])
-                nrows=2*nrows+1
-                ncols=2*ncols+1
-                inrow=int((nrows-1)/2)
-                incol=int((ncols-1)/2)
-        else:
-            value=np.nanmedian(los[cond])
-            std=np.nanstd(los[cond])
-        lon=lns[i]
-        lat=lts[i]
-        azm=np.mean(az[cond])
-        inc=np.mean(lk[cond])
-        wgt=np.sum(quadobs==cats[i])
-        if std==0:
-            print('std=0',i,wgt)
-        elif std/float(wgt)<1e-9:
-            print('stdw',i,std,wgt)
-        if unit=='deg':
-            line="%3.6f %3.6f %1.6f %1.6f %1.6f %1.9f\n"\
-                % (lon,lat,azm,inc,value,std/float(wgt))
-        else:
-            line="%6.3f %6.3f %1.6f %1.6f %1.6f %1.9f\n"\
-                % (lon,lat,azm,inc,value,std/float(wgt))
-        result.write(line)
-    result.close()
-
 def points2map(xs,ys,data):
+    """
+    Converts a list of points into a matrix
+    
+    Parameters:
+        xs (array): x-coordinates or longitudes 
+        ys (array): y-coordinates or latitudes
+        data (array): value for each coordinate
+    
+    Returns:
+        qmap (array): matrix with the data
+        extent (array): extent of the matrix or image (min_x,max_x,min_y,max_y)
+    """
     uxs=np.array(list(set(xs)))
     uys=np.array(list(set(ys)))
     data=np.array(data)
@@ -833,6 +307,21 @@ def points2map(xs,ys,data):
     return qmap,extent
 
 def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
+    """
+    Converts a downsampled image (represented by a text file) into a matrix
+    
+    Parameters:
+        quadfile (str): path for the downsampled image 
+        mask (array): boolean matrix for nan values
+        trans (array): if True transforms lon/lat into planar coordinates
+        cref (boolean): if True reference the matrix with respect to the reference pixel,
+        if None reference the matrix with respect to closest value to 0
+    
+    Returns:
+        qmap (array): matrix with the data
+        ext (array): extent of the matrix or image (min_x,max_x,min_y,max_y)
+        rcoords (array): coordinates for the reference (x-coord,y-coord)
+    """
     quad=open(quadfile)
     linesor=quad.readlines()
     quad.close()
@@ -886,69 +375,17 @@ def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
         rcoords=[refxs[0],refys[0]]
         
     return quad,ext,rcoords
-'''    
-def get_defmap(quadfile='quadtree.txt',mask=None,unit='deg'):
-    quad=open(quadfile)
-    linesor=quad.readlines()
-    quad.close()
-    
-    lines=[line for line in linesor if not len(line.split())<5]
-    
-    xs,ys,qlos=[],[],[]
-    for line in lines:
-        xs.append(float(line.split()[0]))
-        ys.append(float(line.split()[1]))
-        qlos.append(float(line.split()[4]))
-    xs=np.array(xs)
-    ys=np.array(ys)
-    uxs=np.array(list(set(xs)))
-    uys=np.array(list(set(ys)))
-    qlos=np.array(qlos)
-    
-    if linesor[0][0]=='%' and not 'None' in linesor[0]:
-        rcoords=[float(linesor[0].split(':')[1].split(',')[0]),float(linesor[0].split(':')[1].split(',')[1])]
-        posmin=np.argmin((xs-rcoords[0])**2+(ys-rcoords[1])**2)
-    else:
-        posmin=np.argmin(qlos)
-        rcoords=[xs[posmin],ys[posmin]]
-    qlos-=qlos[posmin]
-    
-    if mask is None:
-        xint=min_distance(uxs)
-        yint=min_distance(uys)
-        xnum=int((np.max(xs)-np.min(xs))/xint)
-        ynum=int((np.max(ys)-np.min(ys))/yint)
-    else:
-        xnum=mask.shape[1]
-        ynum=mask.shape[0]
-    
-    lons=np.linspace(np.min(xs),np.max(xs),xnum)
-    lats=np.linspace(np.min(ys),np.max(ys),ynum)[::-1]
-    
-    if not unit=='m':
-        extent=[np.min(xs),np.max(xs),np.min(ys),np.max(ys)]
-    else:
-        utmxs,utmys,z1s,z2s=ll2utm([np.min(xs),np.max(xs)],[np.min(ys),np.max(ys)])
-        refxs,refys,z1s,z2s=ll2utm([rcoords[0]],[rcoords[1]])
-        extent=[utmxs[0],utmxs[1],utmys[0],utmys[1]]
-        rcoords=[refxs[0],refys[0]]
-    
-    qmap=np.zeros((ynum,xnum))
-    for i,lon in enumerate(lons):
-        for j,lat in enumerate(lats):
-            minn=np.argmin((xs-lon)**2+(ys-lat)**2)
-            if mask is None:
-                cond=globe.is_land(lat,lon)
-            else:
-                cond=~mask[j,i]
-            if cond:
-                qmap[j,i]=qlos[minn]
-            else:
-                qmap[j,i]=np.nan
-    return qmap,extent,rcoords
-'''
 
 def min_distance(points):
+    """
+    Gives the minimum distance in a list of coordinates
+    
+    Parameters:
+        points (array): list of points
+        
+    Returns:
+        mini: minimum distance in the list of points
+    """
     if len(points)<=3:
         mini=np.inf
         for i in range(len(points)):
@@ -971,20 +408,20 @@ def min_distance(points):
     else:
         return minright
 
-def run_decompose(th):
-    cwd=os.getcwd()
-    os.chdir('./vmod/varres')
-    cmd='python decompose.py -i insar.unw -t '+str(th)+' -o newtest'
-    result = subprocess.check_output(cmd, shell=True).decode()
-    res=open('newtest.txt')
-    lines=res.readlines()
-    tam=len(lines)
-    res.close()
-    os.chdir(cwd)
-    
-    return tam
-    
 def ll2rc(lon,lat,extent,dims):
+    """
+    Gives the row and column that correspond to a lon/lat coordinate
+    
+    Parameters:
+        lon (float): longitude coordinate
+        lat (float): latitude coordinate
+        extent (array): extent of the image (min_lon,max_lon,min_lat,max_lat)
+        dims (array): dimensions of the image (rows,columns)
+        
+    Returns:
+        row (int): row that corresponds to the coordinate
+        col (int): column that corresponds to the coordinate
+    """
     lonr1, lonr2, latr1, latr2=extent
     lons=np.linspace(lonr1,lonr2,dims[1])
     lats=np.linspace(latr1,latr2,dims[0])[::-1]
@@ -996,6 +433,18 @@ def ll2rc(lon,lat,extent,dims):
     return row,col
 
 def get_closest_point(row,col,dataset):
+    """
+    Gets the closest point for a pixel that is not nan
+    
+    Parameters:
+        row (int): row for the pixel
+        col (int): column for the pixel
+        dataset (array): matrix that represents an image
+    
+    Returns:
+        row (int): row for the closest pixel that is not nan
+        col (int): column for the closest pixel that is not nan
+    """
     if not np.isnan(dataset[row,col]):
         return row,col
     else:
@@ -1012,6 +461,18 @@ def get_closest_point(row,col,dataset):
         return row,col
     
 def read_dataset_h5(h5file,key,plot=True,aoi=None):
+    """
+    Reads and plots the output from mintpy 
+    
+    Parameters:
+        h5file (str): path to h5 file
+        key (str): key for certain dataset (e.g., coherence)
+        plot (boolean): if True plots the dataset
+        aoi (AOI_Selector): AOI_Selector to get the area of interest in the dataset
+    
+    Returns:
+        dataset (array): matrix that represents the dataset
+    """
     h5f=h5py.File(h5file)
     dataset=h5f[key][:]
     
@@ -1051,6 +512,25 @@ def read_dataset_h5(h5file,key,plot=True,aoi=None):
     return dataset
 
 def read_gnss_csv(csvfile,trans=False):
+    """
+    Reads csv file with a gnss dataset 
+    
+    Parameters:
+        csvfile (str): path to csv file
+        trans (boolean): projects the lon/lat coordinates into plane coordinates
+        
+    Returns:
+        names (array): names of the stations
+        xs/lons (array): x-coordinates or longitudes for the stations
+        ys/lats (array): y-coordinates or latitudes for the stations
+        uxs (array): deformation in the east component
+        uys (array): deformation in the north component
+        uzs (array): deformation in the vertical component
+        euxs (array): uncertainties in the deformation in the east component
+        euys (array): uncertainties in the deformation in the north component
+        euzs (array): uncertainties in the deformation in the vertical component
+        ref (array): origin coordinate if a projection was made
+    """
     archivo=open(csvfile,'r')
     linesor=archivo.readlines()
     archivo.close()
@@ -1090,8 +570,28 @@ def read_gnss_csv(csvfile,trans=False):
         return names,np.array(lons),np.array(lats),uxs,uys,uzs,euxs,euys,euzs
 
 def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
-    #if ref and os.path.exists('./'+csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]):
-    #    csvfile=csvfile.split('.')[0]+'_ref.'+csvfile.split('.')[1]
+    """
+    Reads csv file with a downsampled InSAR dataset 
+    
+    Parameters:
+        csvfile (str): path to csv file
+        trans (boolean): if True projects the lon/lat coordinates into plane coordinates (default False)
+        unit (str): units for the coordinates (m for meters or deg for degrees) (default m)
+        ori (array): coordinates (lon,lat) that will be the origin for the projection
+        cref
+        
+    Returns:
+        names (array): names of the stations
+        xs/lons (array): x-coordinates or longitudes for the stations
+        ys/lats (array): y-coordinates or latitudes for the stations
+        uxs (array): deformation in the east component
+        uys (array): deformation in the north component
+        uzs (array): deformation in the vertical component
+        euxs (array): uncertainties in the deformation in the east component
+        euys (array): uncertainties in the deformation in the north component
+        euzs (array): uncertainties in the deformation in the vertical component
+        ref (array): origin coordinate if a projection was made
+    """
     archivo=open(csvfile,'r')
     linesor=archivo.readlines()
     archivo.close()
@@ -1135,6 +635,25 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
         return lons,lats,azs,lks,los,elos,ref
 
 def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=None,scl=None,unit='m',figsize=None):
+    """
+    Plots gnss dataset, horizontal velocities are represented by red arrows
+    vertical velocities are represented by black lines
+    
+    Parameters:
+        xs/lons (array): x-coordinates or longitudes for the stations (m/deg)
+        ys/lats (array): y-coordinates or latitudes for the stations (m/deg)
+        uxs (array): deformation in the east component
+        uys (array): deformation in the north component
+        uzs (array): deformation in the vertical component
+        title (str): title for the plot
+        names (array): names for the stations
+        euxs (array): uncertainties in the deformation in the east component
+        euys (array): uncertainties in the deformation in the north component
+        euzs (array): uncertainties in the deformation in the vertical component
+        scl (float): scale for the arrows
+        unit (str): unit for the coordinates (m for meters or deg for degrees)
+        figsize (tuple): size for the matplotlib figure
+    """
     #Plotting GPS deformation
     if unit=='m':
         norm=1e3
@@ -1214,6 +733,22 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     plt.show()
 
 def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
+    """
+    Creates matrix representing downsampled InSAR dataset replacing los deformation
+    and save it in a npy file
+    
+    Parameters:
+        los (array): new line of sight deformation dataset
+        quadfile (array): downsampled InSAR dataset
+        maskfile (str): npy file with boolean matrix that indicates nan values
+        output (str): npy filename for the output
+        cref (boolean): if True reference the matrix with respect to the reference pixel,
+        if None reference the matrix with respect to closest value to 0
+        
+    Returns:
+        qmap (array): saved matrix that represents downsampled InSAR dataset
+        extent (array): coordinates with the extent of the image
+    """
     archivo=open(quadfile,'r')
     lines=archivo.readlines()
     archivo.close()
@@ -1247,6 +782,25 @@ def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
     return qmap,extent
     
 class AOI_Selector:
+    """
+    Class to create an interactive tool to select the area of interest from
+    a mintpy output h5 file
+    
+    Attributes:
+        wl (float): wavelength of the mission
+        coh (array): coherence dataset in h5 file
+        cohth (float): the pixels that have a coherence value below this won't be plot
+        image (array): dataset to be plot
+        extent (array): coordinates for the extent of the image (min_lon,max_lon,min_lat,max_lat)
+        x1 (float): upper left x-coordinate or longitude of area of interest
+        y1 (float): upper left y-coordinate or latitude of area of interest
+        x2 (float): lower right x-coordinate or longitude of area of interest
+        y2 (float): lower right y-coordinate or latitude of area of interest
+        vmin (float): minimum value for colorbar
+        vmax (float): maximum value for colorbar
+        fig (matplotlib Figure): figure that plots the dataset
+        current_ax (matplotlib subplot): subplot that has the plot for the dataset
+    """
     def __init__(self,
                  h5file,
                  key,
@@ -1330,6 +884,9 @@ class AOI_Selector:
         plt.colorbar(im,orientation='horizontal')
 
         def toggle_selector(self, event):
+            """
+            Activates the selector tool in matplotlib
+            """
             print(' Key pressed.')
             if event.key in ['Q', 'q'] and toggle_selector.RS.active:
                 print(' RectangleSelector deactivated.')
@@ -1349,6 +906,9 @@ class AOI_Selector:
         plt.connect('key_press_event', toggle_selector)
 
     def line_select_callback(self, eclick, erelease):
+        """
+        Catch the coordinates from the selector tool
+        """
         'eclick and erelease are the press and release events'
         self.x1, self.y1 = eclick.xdata, eclick.ydata
         self.x2, self.y2 = erelease.xdata, erelease.ydata
@@ -1356,6 +916,18 @@ class AOI_Selector:
         print(" The button you used were: %s %s" % (eclick.button, erelease.button))
     
 class Ref_Insar_Selector_Pre:
+    """
+    Class to create an interactive tool to select a reference pixel from 
+    an AOI_Selector object
+    
+    Attributes:
+        wl (float): wavelength of the mission
+        xref (float): x-coordinate for the reference
+        yref (float): y-coordinate for the reference
+        coh (array): coherence dataset in h5 file
+        dataset (array): dataset to be plot
+        extent (array): coordinates for the extent of the image (min_lon,max_lon,min_lat,max_lat)
+    """
     def __init__(self,aoi):
         self.xref=None
         self.yref=None
@@ -1397,6 +969,9 @@ class Ref_Insar_Selector_Pre:
         plt.colorbar(im,orientation='horizontal')
 
         def on_click(event):
+            """
+            Captures the coordinates when a user click on the plot
+            """
             row,col=ll2rc(event.xdata,event.ydata,self.extent,self.dataset.shape)
             
             row,col=get_closest_point(row,col,self.dataset)
@@ -1415,6 +990,19 @@ class Ref_Insar_Selector_Pre:
         plt.show()
         
 class Ref_Insar_Selector:
+    """
+    Class to create an interactive tool to select a reference pixel from 
+    a csv file that represents a downsampled InSAR dataset
+    
+    Attributes:
+        wl (float): wavelength of the mission
+        xref (float): x-coordinate for the reference
+        yref (float): y-coordinate for the reference
+        auxdata (tuple): auxiliary information (longitudes, latitudes, azimuth angles, incidence angles, uncertainties)
+        los (array): list with line of sight deformation
+        filename (str): path to the csv file with the downsampled InSAR dataset
+        dataset (array): matrix with the line of sight deformation
+    """
     def __init__(self,csvfile,mask=None,vmin=None,vmax=None):
         
         velocity,extent,refcoords=get_defmap(csvfile,mask)

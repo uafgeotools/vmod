@@ -1,14 +1,3 @@
-"""
-Class to implement inverse methods operating on one or more analytical volcanic source models
-
-Author: Mario Angarita & Ronni Grapenthin
-Date: 6/23/2021
-
-
-TODO:
-- docstrings
-"""
-
 import copy
 import numpy as np
 import sys
@@ -26,20 +15,41 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 
 class Inverse:
+    """
+    Class to implement inverse methods operating on one or more analytical volcanic source models
+    
+    Attributes:
+        sources (array): sources that will be part of a model
+        obs (Data): data object containing one or more datasets
+        minresidual (float): minimum residual achieved with any inversion algorithm
+        minparms (array): parameters corresponding to the minimum residual
+    """
     def __init__(self, obs):
         self.sources = []       #simple list that will contain instances of class Source
         self.obs     = obs      #instance of Data
-        self.model   = None
-        self.iter=0
+        #self.model   = None
+        #self.iter=0
         self.minresidual=None
         self.minparms=None
     
     #add a new source to the geometry
     def register_source(self, source):
+        """
+        Adds a source to the model
+        
+        Parameters:
+            source (Source): source object to be added to the model
+        """
         self.sources.append(source)
 
     #interface to scipy bounded nonlinear least squares implementation
     def nlsq(self):
+        """
+        Non-linear least squares approach using the trust reflective algorithm
+        
+        Returns:
+            params (array): parameters for the model with the minimum residual
+        """
         self.minresidual=1e6
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
@@ -49,6 +59,12 @@ class Inverse:
         return params
     
     def bh(self):
+        """
+        Optimization using basin-hopping algorithm from scipy
+        
+        Returns:
+            params (array): parameters for the model with the minimum residual
+        """
         self.minresidual=1e6
         minimizer_kwargs = dict(method="L-BFGS-B", bounds=self.get_bounds_de())
         if len(self.sources)==0:
@@ -59,6 +75,12 @@ class Inverse:
         return params
     
     def de(self):
+        """
+        Optimization using differential evolution algorithm from scipy
+        
+        Returns:
+            params (array): parameters for the model with the minimum residual
+        """
         self.minresidual=1e6
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
@@ -68,6 +90,12 @@ class Inverse:
         return params
     
     def shg(self):
+        """
+        Optimization using simplicial homology global algorithm from scipy
+        
+        Returns:
+            params (array): parameters for the model with the minimum residual
+        """
         self.minresidual=1e6
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
@@ -79,6 +107,15 @@ class Inverse:
         return params
     
     def log_prior(self,theta):
+        """
+        Logarithmic uniform prior probabilities for the model parameters
+        
+        Parameters:
+            theta (array): parameter values
+            
+        Returns:
+            log_prior (float): logarithm of the prior probability 
+        """
         j=0
         if not -10<theta[-1]<10:
             return -np.inf
@@ -94,6 +131,15 @@ class Inverse:
         return 0.0
     
     def log_likelihood(self,theta):
+        """
+        Logarithmic likelihood for a set of parameters
+        
+        Parameters:
+            theta (array): parameter values
+            
+        Returns:
+            likeli (float): logarithm of the likelihood for the set of parameters 
+        """
         model = self.get_model(theta[0:-1])
         
         errors=self.obs.get_errors()
@@ -105,6 +151,15 @@ class Inverse:
         return likeli
     
     def log_probability(self,theta):
+        """
+        Logarithm of the probability for a set of parameters
+        
+        Parameters:
+            theta (array): parameter values
+            
+        Returns:
+            log_prob (float): logarithm of the probability for the set of parameters 
+        """
         lp = self.log_prior(theta)
         if not np.isfinite(lp):
             return -np.inf
@@ -115,6 +170,16 @@ class Inverse:
         return lp + likeli
     
     def mcmc_em(self,name=None,move=None):
+        """
+        Bayesian inversion approach with multiple algorithms using the emcee library
+        
+        Parameters:
+            name (str): filename for the h5 file that will contain the traces
+            move (str): update algorithm for the steps (metropolis, stretch, kde, de, desnooker, redblue)
+            
+        Returns:
+            traces (array): traces that will give the posterior distribution for the parameters
+        """
         import emcee
         
         inis=[]
@@ -174,6 +239,16 @@ class Inverse:
         return traces
     
     def mcmc(self,name=None):
+        """
+        Bayesian inversion approach with multiple algorithms using the pymc library
+        
+        Parameters:
+            name (str): filename for the h5 file that will contain the traces
+            
+        Returns:
+            traces (array): traces that will give the posterior distribution for the parameters
+            MDL (pymc.MCMC): inversion object
+        """
         import pymc
         self.minresidual=1e6
         data=self.obs.get_data()
@@ -241,6 +316,16 @@ class Inverse:
         return traces,MDL
     
     def doublelog(self,x):
+        """
+        Double logarithmic function to sweep the parameter space more efficiently
+        
+        Parameters:
+            x (float): parameter value 
+            
+        Returns:
+            logx (float): logarithm in base 10 of the parameter value 
+            if value > 1e-2 or value < -1e-2 if not it will give a linear function
+        """
         if x>=-1e-2 and x<=1e-2:
             m=2.0/0.02
             return m*x
@@ -250,6 +335,15 @@ class Inverse:
             return np.log10(x)+3
     
     def invdoublelog(self,y):
+        """
+        Inverse for double logarithmic function to get the parameter value
+        
+        Parameters:
+            logx (float): value given by the doublelog function
+            
+        Returns:
+            x (float): parameter value
+        """
         if y>=-1 and y<=1:
             m=0.02/2.0
             return m*y
@@ -259,6 +353,18 @@ class Inverse:
             return 10**(y-3.0)
     
     def par2log(self,source,i):
+        """
+        Normalizes the bounds and initial guess for the parameters  
+        
+        Parameters:
+            source (Source): source where the parameters will be normalized
+            i (int): index for the parameter
+            
+        Returns:
+            low (float): normalized lower bound for the parameter
+            high (float): normalized upper bound for the parameter
+            ini (float): normalized initial guess for the parameter
+        """
         #orders,parnames=self.get_parnames_orders()
         parnames=source.get_parnames()
         order=int(np.log10(np.max([np.abs(source.low_bounds[i]),np.abs(source.high_bounds[i])])))-1
@@ -274,6 +380,15 @@ class Inverse:
         return low,high,ini
     
     def par2lin(self,pars):
+        """
+        Multiplies normalized parameters with the correspondant magnitude  
+        
+        Parameters:
+            pars (array): normalized parameters
+            
+        Returns:
+            linpars (array): normalized parameters multiply by their correspondant magnitude
+        """
         parnames,orders=self.get_parnames_orders()
         
         linpars=[]
@@ -286,6 +401,17 @@ class Inverse:
         return linpars
     
     def traces2lin(self,traces):
+        """
+        Multiplies normalized parameters with the correspondant magnitude
+        for all the values in the traces
+        
+        Parameters:
+            traces (array): traces with normalized values 
+            
+        Returns:
+            data (array): normalized traces multiply by their correspondant magnitude
+            labels (array): names for the parameters
+        """
         data=[]
         labels=[]
         parnames,orders=self.get_parnames_orders()
@@ -301,6 +427,13 @@ class Inverse:
         return data,labels
     
     def get_parnames_orders(self):
+        """
+        Gives the magnitudes for the parameters
+        
+        Returns:
+            parnames (array): names for the parameters
+            orders (array): magnitudes for the parameters
+        """
         if len(self.sources)==1:
             source=self.sources[0]
             return source.get_parnames(),source.get_orders()
@@ -317,6 +450,18 @@ class Inverse:
             return parnamest,orderst
     
     def get_numsteps(self):
+        """
+        Gives the number of steps, discarded steps and steps 
+        per sample for a Bayesian inversion, if the model has 
+        more than one source the default is
+        steps=6600000, burnin=6000000, thin=1000, if not it will
+        take the values defined in the source object
+        
+        Returns:
+            steps (int): number of steps 
+            burnin (int): number of initial discarded steps
+            thin (int): number of steps per sample
+        """
         if len(self.sources)>1:
             steps=6600000
             burnin=600000
@@ -328,6 +473,13 @@ class Inverse:
     
     #initial guess of source model characteristics, defined when creating the source model
     def get_x0(self):
+        """
+        Concatenates the initial values for the parameters for all sources
+        in the model
+        
+        Returns:
+            x0 (array): intial values for the parameters
+        """
         x0 = []
         
         for s in self.sources:
@@ -337,6 +489,14 @@ class Inverse:
 
     #high and low bounds for the parameters
     def get_bounds(self):
+        """
+        Concatenates and returns the lower and upper bounds for the parameters for all sources
+        in the model
+        
+        Returns:
+            low_b (array): lower bounds for the parameters
+            high_b (array): upper bounds for the parameters
+        """
         low_b  = []
         high_b = []
 
@@ -347,6 +507,12 @@ class Inverse:
         return (low_b, high_b)
     
     def get_bounds_de(self):
+        """
+        Arranges lower and upper bounds in one array for the differential evolution algorithm
+        
+        Returns:
+            bounds (array): bounds for the parameters
+        """
         bounds  = []
 
         for s in self.sources:
@@ -357,18 +523,18 @@ class Inverse:
                     bounds = np.concatenate((bounds,[(s.low_bounds[i],s.high_bounds[i])]))
 
         return bounds
-
-    #least_squares residual function for dipole
-    def fun(self, x):
-        ux_m, uy_m, uz_m = self.forward(x)
-
-        diff = np.concatenate((ux_m,uy_m,uz_m))-self.obs.get_obs()
-        self.iter+=1
-        if self.iter%10==0:
-            print(self.iter)
-        return diff
     
     def forward(self, x, unravel=True):
+        """
+        Computes the forward model for single or multisource model
+        
+        Parameters:
+            unravel (boolean): if True it will return just one array,
+            if False it will separate the deformation in components
+        
+        Returns:
+            data (array): modeled deformation
+        """
         param_cnt = 0
         data=None
         for s in self.sources:
@@ -387,6 +553,15 @@ class Inverse:
         return data
     
     def residual(self,x):
+        """
+        Computes the residuals for the non-linear least squares algorithm
+        
+        Parameters:
+            x (array): parameters in an iteration
+            
+        Returns:
+            res (float): residual for the iteration
+        """
         if self.obs.get_errors() is None:
             res=self.obs.get_data()-self.forward(x)
         else:
@@ -399,6 +574,15 @@ class Inverse:
         return res
     
     def residual_bh(self,x):
+        """
+        Computes the residuals for the optimization algorithms
+        
+        Parameters:
+            x (array): parameters in an iteration
+            
+        Returns:
+            rest (float): residual for the iteration
+        """
         if self.obs.get_errors() is None:
             res=self.obs.get_data()-self.forward(x)
         else:
@@ -411,6 +595,24 @@ class Inverse:
         return rest
     
     def inv_opening(self,xcen,ycen,depth,length,width,strike,dip,reg=False,lamb=1):
+        """
+        Inversion for opening values in a discretized sill
+        
+        Parameters:
+            xcen (float): x-coordinate location for center of the sill (m)
+            ycen (float): y-coordinate location for center of the sill (m)
+            depth (float): depth for center of the sill (m)
+            length (float): length of the discretized sill (m)
+            width (float): width of the discretized sill (m)
+            strike (float): azimuth angle for the sill clockwise from north (degrees)
+            dip (float): dipping angle for the sill (degrees)
+            reg (boolean): if True apply regularization, if False regularization
+            won't be applied
+            lamb (float): regularization constant 
+            
+        Returns:
+            ops (array): openings for the sill patches
+        """
         s=self.sources[0]
         G=s.get_greens(xcen,ycen,depth,length,width,strike,dip)
         if reg==True:
@@ -424,6 +626,24 @@ class Inverse:
         return ops
     
     def get_params_openings(self,xcen,ycen,depth,length,width,strike,dip,ln,wn,ops):
+        """
+        Gives the parameters for each sill patch
+        
+        Parameters:
+            xcen (float): x-coordinate location for center of the sill (m)
+            ycen (float): y-coordinate location for center of the sill (m)
+            depth (float): depth for center of the sill (m)
+            length (float): length of the discretized sill (m)
+            width (float): width of the discretized sill (m)
+            strike (float): azimuth angle for the sill clockwise from north (degrees)
+            dip (float): dipping angle for the sill (degrees)
+            ln (int): divisions in length
+            wn (int): divisions in width
+            ops (array): openings for sill patches 
+            
+        Returns:
+            params (array): parameters for sill patches
+        """
         s=self.sources[0]
         xcs,ycs,zcs=s.get_centers(xcen,ycen,depth,length,width,strike,dip,ln,wn)
         params=[]
@@ -434,6 +654,15 @@ class Inverse:
         return params
 
     def get_model(self,x):
+        """
+        Computes the deformation values for a given set of parameters
+        
+        Parameters:
+            x (array): normalized values for the parameters 
+            
+        Returns:
+            defo (array): deformation values for the given parameters
+        """
         defo=None
         param_cnt = 0
         xlin=[]
@@ -455,6 +684,9 @@ class Inverse:
     
     ##output writers
     def print_model(self):
+        """
+        Prints the parameter names and their values
+        """
         param_cnt = 0
 
         for s in self.sources:

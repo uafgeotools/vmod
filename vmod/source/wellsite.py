@@ -1,20 +1,36 @@
 import numpy as np
 from scipy import special
-import matplotlib.pyplot as plt
-import pandas as pd
 from . import Source
 from .. import util
 from scipy import integrate
 
 class Wellsite(Source):
+    """
+    Class that represents a pressurized well following the implementation from Wangen (2018).
 
-    def get_num_params(self):
-        return 7
-
+    Attributes
+    ----------
+    parameters : array
+        names for the parameters in the model
+    """
     def get_source_id(self):
+        """
+        The function defining the name for the model.
+          
+        Returns:
+            str: Name of the model.
+        """
         return "Wellsite"
     
     def bayesian_steps(self):
+        """
+        Function that defines the number of steps for a bayesian inversion.
+        
+        Returns:
+            steps (int): Number of steps used in the bayesian inversions.
+            burnin (int): discarded number of steps at the begining of the inversion.
+            thin (int): number of steps per sample.
+        """
         steps=3100000
         burnin=10000
         thin=1000
@@ -22,6 +38,12 @@ class Wellsite(Source):
         return steps,burnin,thin
 
     def print_model(self, x):
+        """
+        The function prints the parameters for the model.
+        
+        Parameters:
+           x (list): Parameters for the model.
+        """
         print("Wellsite")
         print("\txcen = %f" % x[0])
         print("\tycen = %f" % x[1])
@@ -31,12 +53,27 @@ class Wellsite(Source):
         print("\tYoung Modulus= %f" % x[5])
         
     def set_parnames(self):
+        """
+        Function defining the names for the parameters in the model.
+        """
         self.parameters=("xcen","ycen","depth","width","pressure","diffu","Young modulus")
     
     # =====================
     # Forward Models
     # =====================
     def pressure(self,x,P,diffu,t):
+        """
+        The function calculates the pressure as a function of time.
+        
+        Parameters:
+           x (float): distance to the injection well (m)
+           P (float): initial pressure (Pa)
+           diffu (float): diffusivity coefficient (m^2/s)
+           t: input time (s)
+           
+        Results:
+            pressure: pressure at given time (Pa)
+        """
         return P*special.erfc(x/(2*np.sqrt(diffu*t)))
     
     def dpressure(self,x,an,fn,k):
@@ -45,17 +82,22 @@ class Wellsite(Source):
     def model_t(self, x, y, t, xcen, ycen, depth, width, P, diffu, E=5, nu=0.2):
        
         """
-        Keyword arguments:
-        ------------------
-        xcen: y-offset of point source epicenter (m): []
-        ycen: y-offset of point source epicenter (m): []
-        depth: Reservoir depth (m): 
-        width: reservoir width (m)
-        P: Initial pressure (MPa): [5-50]
-        diffu: Diffusivity (m^2/s): [10^-4-10^-1]
-        E: Young's modulus (GPa): [5-15]
-        nu: Poisson ratio 
+        The function 
         
+        Parameters:
+            xcen: y-offset of point source epicenter (m): []
+            ycen: y-offset of point source epicenter (m): []
+            depth: Reservoir depth (m): 
+            width: reservoir width (m)
+            P: Initial pressure (MPa): [5-50]
+            diffu: Diffusivity (m^2/s): [10^-4-10^-1]
+            E: Young's modulus (GPa): [5-15]
+            nu: Poisson ratio
+        
+        Returns:
+            ux: the model does not compute deformation in the x-axis
+            uy: the model does not compute deformation in the y-axis
+            uz: deformation in the vertical (m)
         """
         alpha=1
         
