@@ -15,19 +15,17 @@ class Regsill(Source):
         type of dislocation, open for tensile and slip for fault
     ln : 
     """
-    def __init__(self, data, typ=None, ln=None, wn=None):
-        if typ==None or typ=='open':
-            self.typ='open'
-        else:
-            self.typ='slip'
-        if ln==None:
-            self.ln=1
-        else:
-            self.ln=ln
-        if wn==None:
-            self.wn=1
-        else:
-            self.wn=wn
+    def __init__(self, data, typ=None, ln=None,wn=None, xcen=None,ycen=None,depth=None,length=None,width=None,strike=None,dip=None):
+        self.typ = 'open' if typ == 'open' or typ is None else 'slip'
+        self.ln     = 1 if ln     is None else ln
+        self.wn     = 1 if wn     is None else wn
+        self.xcen   = 0 if xcen   is None else xcen
+        self.ycen   = 0 if ycen   is None else ycen
+        self.depth  = 1 if depth  is None else depth
+        self.length = 0 if length is None else length
+        self.width  = 0 if width  is None else width
+        self.strike = 0 if strike is None else strike
+        self.dip    = 0 if dip    is None else dip
         
         super().__init__(data)
         
@@ -35,9 +33,11 @@ class Regsill(Source):
         return False
     
     def set_parnames(self):
-        self.parameters=("xcen","ycen","depth","length","width","strike","dip","slips/openings")
+        self.parameters=("slips/openings")
+    # "xcen","ycen","depth","length","width","strike","dip"
         
     def rotate_xyz(self,xcen,ycen,depth,length,width,strike,dip):
+    # unparameterized because this function is static, no object is involved
     # this function calculates the coordinates of four corners of a triangle
     # (in this RegSill class, the triangle represents a fault plane)
     # inputs: parameters defining the triangle
@@ -46,7 +46,6 @@ class Regsill(Source):
     #   - length [m]: fault length (along strike line)
     #   - width [m]: fault width (along dip line)
     # output: coordinates of top-left, bottom-left, bottom=right, and top-right corners
-
         zcen  = -depth
         srad  = math.radians(strike)
         drad  = math.radians(dip)
@@ -74,6 +73,7 @@ class Regsill(Source):
         return [x1,y1,z1],[x2,y2,z2],[x3,y3,z3],[x4,y4,z4]
         
     def get_centers(self,xcen,ycen,depth,length,width,strike,dip):
+    # also static
     # this function calculates the center coordinates of all fault patches
     # the order of patches to be calculated is from left to right along length, from top to bottom along width
     # for example, for a nl=3,nw=2 fault, the order of calculation is
@@ -82,7 +82,6 @@ class Regsill(Source):
     #
     # calculation is based on the following formula
     # x_{i,j} = x_{top-left} + i/nl*( x_{top-right} - x_{top-left} ) + j/nw*( x_{bottom-left} - x_{top-left} )
-    
         ln = self.ln
         wn = self.wn
         [x1,y1,z1],[x2,y2,z2],[x3,y3,z3],[x4,y4,z4] = self.rotate_xyz(xcen,ycen,depth,length,width,strike,dip)
@@ -94,112 +93,65 @@ class Regsill(Source):
                 ycenters.append( y1 + (y4-y1)/ln*(i + 0.5) + ((y2-y1)/wn)*(j+0.5) )
                 zcenters.append( z1 + (z4-z1)/ln*(i + 0.5) + ((z2-z1)/wn)*(j+0.5) )
         return xcenters,ycenters,zcenters
-    
-    def get_laplacian(self,xcen,ycen,depth,length,width,strike,dip,ln,wn):
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip,ln,wn)
-        L=np.zeros((ln*wn,ln*wn))
-        for i in range(len(xcs)):
-            dist=(np.array(xcs)-xcs[i])**2+(np.array(ycs)-ycs[i])**2+(np.array(zcs)-zcs[i])**2
-            pos=np.argsort(dist)
-            #print(dist[pos[0:5]])
-            if dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]] and dist[pos[1]]==dist[pos[4]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
-                L[i,pos[4]]=1
-            elif dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
-            elif dist[pos[1]]==dist[pos[2]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-        return L
         
-    def get_reg_sill(self,xcen,ycen,depth,length,width,strike,dip,ops):
-        ln=self.ln
-        wn=self.wn
-        xs,ys,zs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
+    def get_reg_sill(self,ops):
+        xs,ys,zs=self.get_centers(self.xcen,self.ycen,self.depth,self.length,self.width,self.strike,self.dip)
         oks=[]
         params=[]
-        ln=self.ln
-        wn=self.wn
-        dat=self.data
         for i in range(len(xs)):
-            oki = Okada(dat)
+            oki = Okada(self.data)
             oki.set_type('open')
             #Initial parameters [xcen,ycen,depth,length,width,opening,strike,dip]
             oki.set_bounds(low_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0], high_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0])
             oks.append(oki)
-            params+=[xs[i],ys[i],-zs[i],length/ln,width/wn,ops[i],strike,dip]
-
+            params+=[xs[i],ys[i],-zs[i],length/self.ln,width/self.wn,ops[i],self.strike,self.dip]
         return oks,params
     
-    def get_greens(self,xcen,ycen,depth,length,width,strike,dip):
-        ln=self.ln
-        wn=self.wn
-        x=self.data.xs
-        y=self.data.ys
+    def get_greens(self):  
+        xcs,ycs,zcs = self.get_centers(self.xcen,self.ycen,self.depth,self.length,self.width,self.strike,self.dip)
+        xo = [self.xcen,self.ycen,self.depth,self.length,self.width,1,self.strike,self.dip]
         
-        oki=Okada(self.data)
-        #print('Tipo',self.typ)
+        oki  = Okada(self.data)
+        # print('Tipo',self.typ)
         oki.set_type(self.typ)
+        defo = oki.forward(xo)
         
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
-        xo=[xcen,ycen,depth,length,width,1,strike,dip]
+        slength = self.length/self.ln
+        swidth  = self.width/self.wn
         
-        defo=oki.forward(xo)
-        
-        slength=length/ln
-        swidth=width/wn
-        
-        if self.typ=='open':
-            op=1
-            sl=0
-        else:
-            op=0
-            sl=1
-        G=np.zeros((len(defo),ln*wn))
-        for i in range(len(xcs)):
-            if self.typ=='open':
-                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,op,strike,dip]
-            else:
-                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,strike,dip]
-            defo=oki.forward(xp)
-            G[:,i]=defo
+        G = np.zeros(( len(defo) , self.ln*self.wn ))
+        for i in range( len(xcs) ):
+            xp     = [xcs[i],ycs[i],-zcs[i],slength,swidth,1,self.strike,self.dip]
+            defo   = oki.forward(xp)
+            G[:,i] = defo
         return G
     
-    def get_laplacian(self,xcen,ycen,depth,length,width,strike,dip):
-        ln=self.ln
-        wn=self.wn
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
-        L=np.zeros((ln*wn,ln*wn))
+    def get_laplacian(self):
+        xcs,ycs,zcs=self.get_centers(self.xcen,self.ycen,self.depth,self.length,self.width,self.strike,self.dip)
+        L  = np.zeros(( self.ln*self.wn , self.ln*self.wn ))
+        
         for i in range(len(xcs)):
-            dist=(np.array(xcs)-xcs[i])**2+(np.array(ycs)-ycs[i])**2+(np.array(zcs)-zcs[i])**2
-            pos=np.argsort(dist)
+            dist = (np.array(xcs)-xcs[i])**2 + (np.array(ycs)-ycs[i])**2 + (np.array(zcs)-zcs[i])**2
+            pos  = np.argsort(dist)
+            
+            L[i,pos[0]]     = -2
             if dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]] and dist[pos[1]]==dist[pos[4]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
-                L[i,pos[4]]=1
+                L[i,pos[1]] =  1
+                L[i,pos[2]] =  1
+                L[i,pos[3]] =  1
+                L[i,pos[4]] =  1
             elif dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
+                L[i,pos[1]] =  1
+                L[i,pos[2]] =  1
+                L[i,pos[3]] =  1
             elif dist[pos[1]]==dist[pos[2]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
+                L[i,pos[1]] =  1
+                L[i,pos[2]] =  1
         return L
     
-    def model(self,x,y,xcen,ycen,depth,length,width,strike,dip,ops):
-        G=self.get_greens(xcen,ycen,depth,length,width,strike,dip)
-        data=G@model
+    def model(self,x,y,ops): # Sorry but I don't really understand this function. I don't know if my attributenization is right.
+        G=self.get_greens()
+        data=G@model 
         
         ux=data[0:len(x)]
         uy=data[len(x):2*len(x)]
@@ -207,7 +159,7 @@ class Regsill(Source):
         
         return ux,uy,uz
         
-    def plot_patches(self,length,width,ops):
+    def plot_patches(self,ops):
     # this function plot the 3D fault into a 2D plane
     # input parameter ops is a 1D array for openings. its order is described in self.get_centers()
         import matplotlib
@@ -215,6 +167,8 @@ class Regsill(Source):
         
         ln = self.ln
         wn = self.wn
+        length = self.length
+        width  = self.width
 
         ok1 = Okada(self.data)
         ok1.set_type('open')
