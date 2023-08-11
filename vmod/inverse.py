@@ -129,25 +129,28 @@ class Inverse:
                 j+=1
         
         return 0.0
-    
-    def log_likelihood(self,theta):
+
+    def log_likelihood(self, theta):
         """
-        Logarithmic likelihood for a set of parameters
-        
+        Calculate the log likelihood with a normal distribution.
+
         Parameters:
             theta (array): parameter values
-            
+
         Returns:
-            likeli (float): logarithm of the likelihood for the set of parameters 
+            likeli (float): logarithm of the likelihood 
         """
         model = self.get_model(theta[0:-1])
+        data = self.obs.get_data()
+        diff = data - model
+        std_devs = self.obs.get_errors()
+        log_std_devs = np.log(std_devs)
+
+        likeli = -0.5 * (len(model) * np.log(2 * np.pi) + np.sum(2 * log_std_devs) + np.sum(((diff/std_devs) ** 2)))
         
-        errors=self.obs.get_errors()
-        data=self.obs.get_data()
-        sigma2 = errors**2 + model**2 * np.exp(2 * theta[-1])
-        likeli=-0.5 * np.sum((data - model) ** 2 / sigma2 + np.log(sigma2))
         if np.isnan(likeli):
             return -np.inf
+        
         return likeli
     
     def log_probability(self,theta):
@@ -194,7 +197,7 @@ class Inverse:
         
         steps,burnin,thin=self.get_numsteps()
         
-        pos = np.array(ini) + 1e-4 * np.random.randn(2*len(inis), len(inis))
+        pos = np.array(inis) + 1e-4 * np.random.randn(2*len(inis), len(inis))
         nwalkers, ndim = pos.shape
 
         if move=='metropolis':
@@ -280,7 +283,7 @@ class Inverse:
             #Probability distribution
             z = pymc.Normal('z', mu=defo*wts, tau=1.0/10**sigma, value=data*wts, observed=True)
             return locals()
-
+        
         #Making MCMC model
         MDL = pymc.MCMC(model(data))
 
@@ -750,6 +753,3 @@ class Inverse:
                 np.savetxt(prefix+"_source_loc.gmt", dat, fmt='%s' )
         else:
             print("No model, nothing to write")
-
-
-
