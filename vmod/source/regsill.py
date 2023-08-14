@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from .. import util
 from . import Source
 from .okada import Okada
@@ -104,7 +105,7 @@ class Regsill(Source):
             #Initial parameters [xcen,ycen,depth,length,width,opening,strike,dip]
             oki.set_bounds(low_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0], high_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0])
             oks.append(oki)
-            params+=[xs[i],ys[i],-zs[i],length/self.ln,width/self.wn,ops[i],self.strike,self.dip]
+            params+=[xs[i],ys[i],-zs[i],self.length/self.ln,self.width/self.wn,ops[i],self.strike,self.dip]
         return oks,params
     
     def get_greens(self):  
@@ -127,26 +128,29 @@ class Regsill(Source):
         return G
     
     def get_laplacian(self):
-        xcs,ycs,zcs=self.get_centers(self.xcen,self.ycen,self.depth,self.length,self.width,self.strike,self.dip)
+        xcs,ycs,zcs=self.get_centers(0,0,0,self.ln,self.wn,90,0)
         L  = np.zeros(( self.ln*self.wn , self.ln*self.wn ))
         
         for i in range(len(xcs)):
             dist = (np.array(xcs)-xcs[i])**2 + (np.array(ycs)-ycs[i])**2 + (np.array(zcs)-zcs[i])**2
+            print(dist)
             pos  = np.argsort(dist)
             
-            L[i,pos[0]]     = -2
             if dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]] and dist[pos[1]]==dist[pos[4]]:
-                L[i,pos[1]] =  1
-                L[i,pos[2]] =  1
-                L[i,pos[3]] =  1
-                L[i,pos[4]] =  1
+                L[i,pos[0]] =  4
+                L[i,pos[1]] = -1
+                L[i,pos[2]] = -1
+                L[i,pos[3]] = -1
+                L[i,pos[4]] = -1
             elif dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]]:
-                L[i,pos[1]] =  1
-                L[i,pos[2]] =  1
-                L[i,pos[3]] =  1
+                L[i,pos[0]] =  3
+                L[i,pos[1]] = -1
+                L[i,pos[2]] = -1
+                L[i,pos[3]] = -1
             elif dist[pos[1]]==dist[pos[2]]:
-                L[i,pos[1]] =  1
-                L[i,pos[2]] =  1
+                L[i,pos[0]] =  2
+                L[i,pos[1]] = -1
+                L[i,pos[2]] = -1
         return L
     
     def model(self,x,y,ops): # Sorry but I don't really understand this function. I don't know if my attributenization is right.
