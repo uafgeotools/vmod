@@ -19,6 +19,7 @@ class Source:
         self.x0          = None
         self.offsets     = False
         self.parameters  = None
+        self.reg         = False
         self.low_bounds  = []
         self.high_bounds = []
         
