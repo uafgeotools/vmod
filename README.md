@@ -1,5 +1,5 @@
 # V-MOD
-Volcano source model and inversion framework for geodesy
+Versatile source model and inversion framework for geodesy
 
 If the repo is made public vmod can be installed from Github with:  
 pip install git+https://github.com/uafgeotools/vmod  
