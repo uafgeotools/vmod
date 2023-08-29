@@ -90,15 +90,15 @@ class Penny(Source):
         h  = d / rd
         r  = np.sqrt(x ** 2 + y ** 2)
 
-        csi1,w1 = util.gauleg(eps,10,41)
-        csi2,w2 = util.gauleg(10,60,41)
+        csi1,w1 = self.gauleg(eps,10,41)
+        csi2,w2 = self.gauleg(10,60,41)
         csi     = np.concatenate((csi1,csi2))
         wcsi    = np.concatenate((w1,w2))
 
         if csi.shape[0] == 1:
             csi=csi.T
 
-        phi1,psi1,t,wt=util.psi_phi(h)
+        phi1,psi1,t,wt=self.psi_phi(h)
 
         phi=np.matmul(np.sin(np.outer(csi,t)) , phi1*wt)
         psi=np.matmul(np.divide(np.sin(np.outer(csi,t)), np.outer(csi,t)) - np.cos(np.outer(csi,t)),psi1*wt)
