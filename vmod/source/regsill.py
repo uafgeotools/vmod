@@ -14,38 +14,75 @@ class Regsill(Source):
         names for the parameters in the model
     typ : str
         type of dislocation, open for tensile and slip for fault
-    ln : 
+    ln : number of segments in the lenght
+    wn : number of segments in the width
+    xcen : x-coordinate for the center of the sill/fault
+    ycen : y-coordinate for the center of the sill/fault
+    depth : depth of the center of the sill/fault
+    length : length of the sill/fault
+    width : width of the sill/fault
+    strike : orientation of the sill/fault clockwise from north
+    dip : dip angle of the fault 0 horizontal, 90 vertical
+    lamb : regularization constant
     """
-    def __init__(self, data, typ=None, ln=None, wn=None):
-        if typ==None or typ=='open':
-            self.typ='open'
-        else:
-            self.typ='slip'
-        if ln==None:
-            self.ln=1
-        else:
-            self.ln=ln
-        if wn==None:
-            self.wn=1
-        else:
-            self.wn=wn
+    def __init__(self, data, typ=None, ln=None,wn=None, xcen=None,ycen=None,depth=None,length=None,width=None,strike=None,dip=None,lamb=None,rake=None):
+        self.typ = 'open' if typ == 'open' or typ is None else 'slip'
+        self.ln     = 1 if ln     is None else ln
+        self.wn     = 1 if wn     is None else wn
+        self.xcen   = 0 if xcen   is None else xcen
+        self.ycen   = 0 if ycen   is None else ycen
+        self.depth  = 1 if depth  is None else depth
+        self.length = 0 if length is None else length
+        self.width  = 0 if width  is None else width
+        self.strike = 0 if strike is None else strike
+        self.dip    = 0 if dip    is None else dip
+        self.rake   = 0 if rake   is None else rake
+        self.lamb   = 0 if lamb   is None else lamb
         
         super().__init__(data)
+        
+        self.reg    = True
         
     def time_dependent(self):
         return False
     
     def set_parnames(self):
-        self.parameters=("xcen","ycen","depth","length","width","strike","dip","slips/openings")
+        """
+        Function defining the names for the parameters in the model.
+        """
+        self.parameters=()
+        for i in range(self.ln*self.wn):
+            if self.typ=='open':
+                self.parameters+=('open'+str(i),)
+            else:
+                self.parameters+=('slip'+str(i),)
+    
+    def set_x0(self,x0):
+        """
+        Initial guess for the openings/slips
+        """
+        self.get_parnames()
+        self.x0=[x0]*(self.ln*self.wn)
+    
+    def set_bounds(self,low_bound,high_bound):
+        """
+        Bounds for the openings/slips
+        """
+        self.get_parnames()
+        self.low_bounds=[low_bound]*(self.ln*self.wn)
+        self.high_bounds=[high_bound]*(self.ln*self.wn)
         
-    def rotate_xyz(self,xcen,ycen,depth,length,width,strike,dip):
-        cx=xcen
-        cy=ycen
-        cz=-depth
-        wp=width*np.cos(np.radians(dip))
-        wr=width*np.sin(np.radians(dip))
-        l=length
-        phi=strike
+    def rotate_xyz(self):
+        """
+        Rotation for the patches in the sill/fault
+        """
+        cx=self.xcen
+        cy=self.ycen
+        cz=-self.depth
+        wp=self.width*np.cos(np.radians(self.dip))
+        wr=self.width*np.sin(np.radians(self.dip))
+        l=self.length
+        phi=self.strike
         x1 = cx + wp/2 * np.cos(np.radians(phi)) - l/2 * np.sin(np.radians(phi))
         y1 = cy + wp/2 * np.sin(np.radians(phi)) + l/2 * np.cos(np.radians(phi))
         z1 = cz - wr/2
@@ -61,138 +98,100 @@ class Regsill(Source):
         
         return [x1,x2,x3,x4],[y1,y2,y3,y4],[z1,z2,z3,z4]
         
-    def get_centers(self,xcen,ycen,depth,length,width,strike,dip):
-        xc=xcen
-        yc=ycen
-        zc=-depth
+    def get_centers(self):
+        """
+        Returns the centers for sill/fault patches
+        """
+        xc=self.xcen
+        yc=self.ycen
+        zc=-self.depth
         ln=self.ln
         wn=self.wn
-        lslice=length/ln
-        wslice=width/wn
-        fwc=xcen-width/2+width/(2*wn)
-        flc=ycen-length/2+length/(2*ln)
+        lslice=self.length/self.ln
+        wslice=self.width/self.wn
+        fwc=self.xcen-self.width/2+self.width/(2*self.wn)
+        flc=self.ycen-self.length/2+self.length/(2*self.ln)
         #print(fwc,flc)
         xcs,ycs,zcs=[],[],[]
         if wn%2==0:
-            wi=wn/2
+            wi=self.wn/2
         else:
-            wi=(wn-1)/2
+            wi=(self.wn-1)/2
             
         if ln%2==0:
-            li=ln/2
+            li=self.ln/2
         else:
-            li=(ln-1)/2
+            li=(self.ln-1)/2
             
         for i in range(int(wi)):
-            wfake=2*np.abs(fwc-xcen+float(i)*wslice)
+            wfake=2*np.abs(fwc-self.xcen+float(i)*wslice)
             for j in range(int(li)):
-                lfake=2*np.abs(flc-ycen+float(j)*lslice)
-                xs,ys,zs=self.rotate_xyz(xcen,ycen,depth,lfake,wfake,strike,dip)
+                lfake=2*np.abs(flc-self.ycen+float(j)*lslice)
+                xs,ys,zs=self.rotate_xyz()
                 for x in xs:
                     xcs.append(x)
                 for y in ys:
                     ycs.append(y)
                 for z in zs:
                     zcs.append(z)
-        print('Puntos 1',len(xcs),wn%2,ln%2)
-        if not ln%2==0:
+        #print('Puntos 1',len(xcs),wn%2,ln%2)
+        if not self.ln%2==0:
             for j in range(int(li)):
                 wfake=0
-                lfake=2*np.abs(flc-ycen+float(j)*lslice)
-                xs,ys,zs=self.rotate_xyz(xcen,ycen,depth,lfake,wfake,strike,dip)
+                lfake=2*np.abs(flc-self.ycen+float(j)*lslice)
+                xs,ys,zs=self.rotate_xyz()
                 for x in xs[1:3]:
                     xcs.append(x)
                 for y in ys[1:3]:
                     ycs.append(y)
                 for z in zs[1:3]:
                     zcs.append(z)
-        print('Puntos 2',len(xcs))
-        if not wn%2==0:
+        #print('Puntos 2',len(xcs))
+        if not self.wn%2==0:
             for i in range(int(wi)):
-                wfake=2*np.abs(fwc-xcen+float(i)*wslice)
+                wfake=2*np.abs(fwc-self.xcen+float(i)*wslice)
                 lfake=0
-                xs,ys,zs=self.rotate_xyz(xcen,ycen,depth,lfake,wfake,strike,dip)
+                xs,ys,zs=self.rotate_xyz()
                 for x in xs[0:2]:
                     xcs.append(x)
                 for y in ys[0:2]:
                     ycs.append(y)
                 for z in zs[0:2]:
                     zcs.append(z)
-        print('Puntos 3',len(xcs))
-        if (not wn%2==0) and (not ln%2==0):
-            print('Ninguno')
-            xcs.append(xcen)
-            ycs.append(ycen)
-            zcs.append(-depth)
-        print('Puntos 4',len(xcs))
+        #print('Puntos 3',len(xcs))
+        if (not self.wn%2==0) and (not self.ln%2==0):
+            xcs.append(self.xcen)
+            ycs.append(self.ycen)
+            zcs.append(-self.depth)
+        #print('Puntos 4',len(xcs))
         return xcs,ycs,zcs
     
-    def get_laplacian(self,xcen,ycen,depth,length,width,strike,dip,ln,wn):
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip,ln,wn)
-        L=np.zeros((ln*wn,ln*wn))
-        for i in range(len(xcs)):
-            dist=(np.array(xcs)-xcs[i])**2+(np.array(ycs)-ycs[i])**2+(np.array(zcs)-zcs[i])**2
-            pos=np.argsort(dist)
-            #print(dist[pos[0:5]])
-            if dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]] and dist[pos[1]]==dist[pos[4]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
-                L[i,pos[4]]=1
-            elif dist[pos[1]]==dist[pos[2]] and dist[pos[1]]==dist[pos[3]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-                L[i,pos[3]]=1
-            elif dist[pos[1]]==dist[pos[2]]:
-                L[i,pos[0]]=-2
-                L[i,pos[1]]=1
-                L[i,pos[2]]=1
-        return L
-        
-    def get_reg_sill(self,xcen,ycen,depth,length,width,strike,dip,ops):
-        ln=self.ln
-        wn=self.wn
-        xs,ys,zs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
-        oks=[]
-        params=[]
-        ln=self.ln
-        wn=self.wn
-        dat=self.data
-        for i in range(len(xs)):
-            oki = Okada(dat)
-            oki.set_type('open')
-            #Initial parameters [xcen,ycen,depth,length,width,opening,strike,dip]
-            oki.set_bounds(low_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0], high_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0])
-            oks.append(oki)
-            params+=[xs[i],ys[i],-zs[i],length/ln,width/wn,ops[i],strike,dip]
-
-        return oks,params
-    
-    def get_greens(self,xcen,ycen,depth,length,width,strike,dip):
+    def get_greens(self):
+        """
+        Greens functions for the patches
+        """
         ln=self.ln
         wn=self.wn
         x=self.data.xs
         y=self.data.ys
         
         dat1 = Gnss()
-        dat1.add_xs(xs)
-        dat1.add_ys(ys)
+        dat1.add_xs(x)
+        dat1.add_ys(y)
         
-        dat1.add_data(xs*0,xs*0,xs*0)
+        dat1.add_data(x*0,x*0,x*0)
         
         oki=Okada(dat1)
         #print('Tipo',self.typ)
         oki.set_type(self.typ)
         
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
-        xo=[xcen,ycen,depth,length,width,1,strike,dip]
+        xcs,ycs,zcs=self.get_centers()
+        xo=[self.xcen,self.ycen,self.depth,self.length,self.width,1,self.strike,self.dip]
         
         defo=oki.forward(xo)
         
-        slength=length/ln
-        swidth=width/wn
+        slength=self.length/ln
+        swidth=self.width/wn
         
         if self.typ=='open':
             op=1
@@ -203,17 +202,20 @@ class Regsill(Source):
         G=np.zeros((len(defo),ln*wn))
         for i in range(len(xcs)):
             if self.typ=='open':
-                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,op,strike,dip]
+                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,op,self.strike,self.dip]
             else:
-                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,strike,dip]
+                xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,self.strike,self.dip,self.rake]
             defo=oki.forward(xp)
             G[:,i]=defo
         return G
     
-    def get_laplacian(self,xcen,ycen,depth,length,width,strike,dip):
+    def get_laplacian(self):
+        """
+        Second order laplacian to regularized the patches in the sill/fault
+        """
         ln=self.ln
         wn=self.wn
-        xcs,ycs,zcs=self.get_centers(xcen,ycen,depth,length,width,strike,dip)
+        xcs,ycs,zcs=self.get_centers()
         L=np.zeros((ln*wn,ln*wn))
         for i in range(len(xcs)):
             dist=(np.array(xcs)-xcs[i])**2+(np.array(ycs)-ycs[i])**2+(np.array(zcs)-zcs[i])**2
@@ -235,8 +237,15 @@ class Regsill(Source):
                 L[i,pos[2]]=1
         return L
     
-    def model(self,x,y,xcen,ycen,depth,length,width,strike,dip,ops):
-        G=self.get_greens(xcen,ycen,depth,length,width,strike,dip)
+    def model(self,x,y,*ops):
+        """
+        3d displacement produce by the discretized sill
+          
+        Parameters:
+            ops: array that contains the opening/slip values for the patches
+        """
+        G=self.get_greens()
+        model=np.array(ops)
         data=G@model
         
         ux=data[0:len(x)]
@@ -245,7 +254,13 @@ class Regsill(Source):
         
         return ux,uy,uz
         
-    def plot_patches(self,length,width,ops):
+    def plot_patches(self,ops):
+        """
+        Auxiliary function to plot the opening/slip values
+        
+        Parameters:
+            ops: array that contains the opening/slip values for the patches
+        """
         import matplotlib
         import matplotlib.pyplot as plt
         import numpy as np
@@ -255,12 +270,12 @@ class Regsill(Source):
 
         ok1 = Okada(self.data)
         ok1.set_type('open')
-        xs,ys,zs=self.get_centers(0,0,0,length,width,0,0)
+        xs,ys,zs=self.get_centers(0,0,0,self.length,self.width,0,0)
 
         patches=[]
         fig, ax = plt.subplots()
         for i in range(len(xs)):
-            rect = matplotlib.patches.Rectangle((xs[i]-length/(2*ln),ys[i]-width/(2*wn)), length/ln, width/wn)
+            rect = matplotlib.patches.Rectangle((xs[i]-self.length/(2*ln),ys[i]-self.width/(2*wn)), self.length/ln, self.width/wn)
             patches.append(rect)
 
         # values as numpy array
@@ -275,7 +290,7 @@ class Regsill(Source):
         polys = ax.add_collection(coll)
         fig.colorbar(polys, label='Opening(m)')
 
-        plt.xlim(-width/2,width/2)
-        plt.ylim(-length/2,length/2)
+        plt.xlim(-self.width/2,self.width/2)
+        plt.ylim(-self.length/2,self.length/2)
 
         plt.show()
