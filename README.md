@@ -1,5 +1,5 @@
+<img src="https://github.com/uafgeotools/vmod/assets/16811978/297cecd1-78d6-4146-9f7a-fc1c623f1cbf" width="300">
 
-![logo_beta1](https://github.com/uafgeotools/vmod/assets/16811978/297cecd1-78d6-4146-9f7a-fc1c623f1cbf)
 # Versatile Modeling Of Deformation
 
 ***
