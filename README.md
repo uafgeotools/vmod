@@ -1,4 +1,6 @@
-<img src="https://github.com/uafgeotools/vmod/assets/16811978/297cecd1-78d6-4146-9f7a-fc1c623f1cbf" width="300">
+[comment]: <> (<img src="https://github.com/uafgeotools/vmod/assets/16811978/297cecd1-78d6-4146-9f7a-fc1c623f1cbf" width="300">)
+<img src="https://github.com/uafgeotools/vmod/assets/16811978/aaa335b6-5e03-41b3-ae65-b7c4edf113f5" width="300">
+[comment]: <> (![logo_beta2](https://github.com/uafgeotools/vmod/assets/16811978/aaa335b6-5e03-41b3-ae65-b7c4edf113f5))
 
 # Versatile Modeling Of Deformation
 
