@@ -2,6 +2,7 @@
 <img src="https://github.com/uafgeotools/vmod/assets/16811978/aaa335b6-5e03-41b3-ae65-b7c4edf113f5" width="500">
 
 # Versatile Modeling Of Deformation
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10070627.svg)](https://doi.org/10.5281/zenodo.10070627)
 
 ### Authors: Mario Angarita, Ronni Grapenthin, Scott Henderson, Michael Christoffersen and Kyle Anderson
 
