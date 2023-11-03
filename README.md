@@ -54,7 +54,7 @@ $conda env create -f vmod.yml
 
 ## Run an inversion:
 
-In this repository we included several notebooks to show the steps necessary to run an inversion using [GNSS](dvd_gnss_low.ipynb), [InSAR](dvd_insar_low_off.ipynb) and [joint](dvd_joint_low.ipynb) datasets.
+In this repository we included several notebooks to show the steps necessary to run an inversion using [GNSS](dvd_gnss_low.ipynb), [InSAR](dvd_insar_low_off.ipynb), [EDM](example_synthetic_edm.ipynb) and [joint](dvd_joint_low.ipynb) datasets. We also included an example using real datasets on [Unimak Island](example_unimak_joint.ipynb).
 
 ## Add new datatype:
 
