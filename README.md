@@ -1,5 +1,5 @@
 [comment]: <> (<img src="https://github.com/uafgeotools/vmod/assets/16811978/297cecd1-78d6-4146-9f7a-fc1c623f1cbf" width="300">)
-<img src="https://github.com/uafgeotools/vmod/assets/16811978/aaa335b6-5e03-41b3-ae65-b7c4edf113f5" width="500">
+<img src="https://github.com/uafgeotools/vmod/assets/16811978/8cc49246-df4c-43fb-9254-a8351d0ebc83" width="500">
 
 # Versatile Modeling Of Deformation
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10070627.svg)](https://doi.org/10.5281/zenodo.10070627)
@@ -37,7 +37,7 @@ The framework offers two different inversion techniques to solve for the source 
 
 The inversions can include one or multiple data types in the inversion and the model can be composed by multiple sources. The user can customize or inherit current models to create complexer geometries.
 
-![class_diag_new](https://github.com/uafgeotools/vmod/assets/16811978/914866ca-d13c-4760-b556-2bd58ce757ba)
+![class_diag_v2](https://github.com/uafgeotools/vmod/assets/16811978/8c49b4b4-3399-440f-81a7-9aefc79887a8)
 
 ## Setup
 
