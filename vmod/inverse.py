@@ -29,6 +29,9 @@ class Inverse:
         self.obs     = obs      #instance of Data
         #self.model   = None
         #self.iter=0
+        self.steps=None
+        self.burnin=None
+        self.thin=None
         self.minresidual=None
         self.minparms=None
     
@@ -471,6 +474,23 @@ class Inverse:
             
             return parnamest,orderst
     
+    def set_numsteps(self,steps,burnin,thin):
+        """
+        Set the number of steps, discarded steps and steps 
+        per sample for a Bayesian inversion, if the model has 
+        more than one source the default is
+        steps=6600000, burnin=6000000, thin=1000, if not it will
+        take the values defined in the source object
+        
+        Returns:
+            steps (int): number of steps 
+            burnin (int): number of initial discarded steps
+            thin (int): number of steps per sample
+        """
+        self.steps=steps
+        self.burnin=burnin
+        self.thin=thin
+    
     def get_numsteps(self):
         """
         Gives the number of steps, discarded steps and steps 
@@ -484,7 +504,11 @@ class Inverse:
             burnin (int): number of initial discarded steps
             thin (int): number of steps per sample
         """
-        if len(self.sources)>1:
+        if not (self.steps is None or self.burnin is None or self.thin is None):
+            steps=self.steps
+            burnin=self.burnin
+            thin=self.thin
+        elif len(self.sources)>1:
             steps=6600000
             burnin=600000
             thin=1000
