@@ -7,29 +7,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vmod"
-version = "0.0.1"
-description = "Volcano source model and inversion framework for geodesy"
+version = "1.0.0"
+description = "Versatile Modeling of Deformation"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {file = "LICENSE.txt"}
+license = {file = "LICENSE"}
 authors = [
-    {name = "Mario Angarita Vargas"},
-    {email = "mfangaritasr@alaska.edu"}
+    {name = "Mario Angarita Vargas", email = "mfangaritasr@alaska.edu"},
+    {name = "Ronni Grapenthin", email = "rgrapenthin@alaska.edu"},
+    {name = "Scott Henderson", email = "scottyh@uw.edu"},
+    {name = "Michael Christoffersen", email = "mchristoffersen@alaska.edu"},
+    {name = "Kyle Anderson", email = "kranderson@usgs.gov"}
 ]
 dependencies = [
-    "global_land_mask==1.0.0",
-    "h5py==3.7.0",
-    "ipython==8.8.0",
-    "matplotlib==3.5.3",
-    "numpy==1.23.5",
-    "pandas==1.5.3",
-    "pymc==2.3.8",
-    "rasterio==1.3.4",
-    "scipy==1.10.0",
-    "scikit-image==0.20.0",
-    "utm==0.7.0"
+    "h5py == 3.*",
+    "ipython == 8.*",
+    "matplotlib == 3.*",
+    "numpy == 1.*",
+    "pandas == 1.*",
+    "pymc == 2.3.8",
+    "rasterio == 1.*",
+    "scipy == 1.*",
+    "scikit-image == 0.22.0",
+    "utm == 0.7.0"
 ]
 
 [project.urls]
-documentation = "ADD_ME"
+documentation = "https://github.com/uafgeotools/vmod"
 repository = "https://github.com/uafgeotools/vmod"
