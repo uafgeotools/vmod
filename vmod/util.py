@@ -18,7 +18,6 @@ from IPython.display import display
 import matplotlib
 from scipy import stats
 from scipy.interpolate import interp1d
-from global_land_mask import globe
 from skimage.restoration import denoise_nl_means, estimate_sigma
 
 
