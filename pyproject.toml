@@ -21,7 +21,6 @@ authors = [
 ]
 dependencies = [
     "h5py == 3.*",
-    "ipython == 8.*",
     "matplotlib == 3.*",
     "numpy == 1.*",
     "pandas == 1.*",
