@@ -43,7 +43,7 @@ The inversions can include one or multiple data types in the inversion and the m
 
 We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
-conda create --name vmod -c conda-forge 'python=3.9.*' 'pymc=2.3.8' 'setuptools>=61'
+conda create --name vmod -c conda-forge "python=3.9.*" "pymc=2.3.8" "setuptools>=61"
 ```
 PyMC must be installed with conda, pip fails to build version 2.3.8 on some machines.
 
