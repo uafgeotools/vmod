@@ -39,7 +39,7 @@ The inversions can include one or multiple data types in the inversion and the m
 
 ![class_diag_v2](https://github.com/uafgeotools/vmod/assets/16811978/8c49b4b4-3399-440f-81a7-9aefc79887a8)
 
-## Installation
+## Standard Installation
 
 We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
@@ -49,7 +49,7 @@ PyMC must be installed with conda, pip fails to build version 2.3.8 on some mach
 
 ```console
 conda activate vmod
-pip install git+https://github.com/uafgeotools/vmod.git
+pip install vmod-geodesy
 ```
 
 ## Run an inversion:
@@ -58,7 +58,7 @@ In this repository we included several notebooks to show the steps necessary to 
 
 ## Add new datatype:
 
-To include a new datatype you should create a new file and add it to the data folder. This file should contain a new class that inherit from the 'Data' class and that has the functions to initialize the attributes, adding the components belonging to the datatype and a function to derive the components from 3d displacements. For example, in the Insar class we defined the following functions:
+**Users wishing to include a new datatype should clone the source repository and create a new file in the data folder.** This file should contain a new class that inherit from the 'Data' class and that has the functions to initialize the attributes, adding the components belonging to the datatype and a function to derive the components from 3d displacements. For example, in the Insar class we defined the following functions:
 
 ```python
 class Insar(Data):
@@ -72,7 +72,7 @@ class Insar(Data):
 
 ## Add new model:
 
-To include a new model you should create a new file and add it to the source folder. This file should contain a new class that inherit from the 'Source' class and that has a function returning the names of the parameters in your model and a function that gives the implementation of your model and return the 3d displacement. If you want to use this model with data that has a temporal dependency you should include the function 'model_t' that implements a time-dependant model. As an option you can include additional functions that return tilt displacements with the function 'model_tilt' or if it has a temporal dependency 'model_tilt_t'. For example, here we show the required functions in our Mogi model:
+**Users wishing to include a new model should clone the source repository and create a new file in the source folder.** This file should contain a new class that inherit from the 'Source' class and that has a function returning the names of the parameters in your model and a function that gives the implementation of your model and return the 3d displacement. If you want to use this model with data that has a temporal dependency you should include the function 'model_t' that implements a time-dependant model. As an option you can include additional functions that return tilt displacements with the function 'model_tilt' or if it has a temporal dependency 'model_tilt_t'. For example, here we show the required functions in our Mogi model:
 
 ```python
 class Mogi(Source):
