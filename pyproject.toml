@@ -28,7 +28,9 @@ dependencies = [
     "rasterio == 1.*",
     "scipy == 1.*",
     "scikit-image == 0.22.0",
-    "utm == 0.7.0"
+    "utm == 0.7.0",
+    "jupyterlab == 4.*",
+    "corner == 2.*"
 ]
 
 [project.urls]
