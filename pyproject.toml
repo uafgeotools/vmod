@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vmod"
+name = "vmod-geodesy"
 version = "1.0.0"
 description = "Versatile Modeling of Deformation"
 readme = "README.md"

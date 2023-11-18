@@ -5,6 +5,6 @@ build:
 upload:
 	python3 -m twine upload dist/*
 clean:
-	rm -r dist/
+	rm -rf dist/
 sdist:
 	python -m build . --sdist
