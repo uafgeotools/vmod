@@ -39,18 +39,17 @@ The inversions can include one or multiple data types in the inversion and the m
 
 ![class_diag_v2](https://github.com/uafgeotools/vmod/assets/16811978/8c49b4b4-3399-440f-81a7-9aefc79887a8)
 
-## Setup
+## Installation
 
-The first step to install the framework is to clone this repository:
-
+We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
-$git clone https://github.com/uafgeotools/vmod.git
+conda create --name vmod -c conda-forge 'python=3.9.*' 'pymc=2.3.8' 'setuptools>=61'
 ```
-
-Then create the environment in conda from the vmod.yml file:
+PyMC must be installed with conda, pip fails to build version 2.3.8 on some machines.
 
 ```console
-$conda env create -f vmod.yml 
+conda activate vmod
+pip install git+https://github.com/uafgeotools/vmod.git
 ```
 
 ## Run an inversion:
