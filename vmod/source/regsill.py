@@ -72,16 +72,16 @@ class Regsill(Source):
         self.low_bounds=[low_bound]*(self.ln*self.wn)
         self.high_bounds=[high_bound]*(self.ln*self.wn)
         
-    def rotate_xyz(self):
+    def rotate_xyz(self,length,width):
         """
         Rotation for the patches in the sill/fault
         """
         cx=self.xcen
         cy=self.ycen
         cz=-self.depth
-        wp=self.width*np.cos(np.radians(self.dip))
-        wr=self.width*np.sin(np.radians(self.dip))
-        l=self.length
+        wp=width*np.cos(np.radians(self.dip))
+        wr=width*np.sin(np.radians(self.dip))
+        l=length
         phi=self.strike
         x1 = cx + wp/2 * np.cos(np.radians(phi)) - l/2 * np.sin(np.radians(phi))
         y1 = cy + wp/2 * np.sin(np.radians(phi)) + l/2 * np.cos(np.radians(phi))
@@ -127,7 +127,7 @@ class Regsill(Source):
             wfake=2*np.abs(fwc-self.xcen+float(i)*wslice)
             for j in range(int(li)):
                 lfake=2*np.abs(flc-self.ycen+float(j)*lslice)
-                xs,ys,zs=self.rotate_xyz()
+                xs,ys,zs=self.rotate_xyz(lfake,wfake)
                 for x in xs:
                     xcs.append(x)
                 for y in ys:
@@ -139,7 +139,7 @@ class Regsill(Source):
             for j in range(int(li)):
                 wfake=0
                 lfake=2*np.abs(flc-self.ycen+float(j)*lslice)
-                xs,ys,zs=self.rotate_xyz()
+                xs,ys,zs=self.rotate_xyz(lfake,wfake)
                 for x in xs[1:3]:
                     xcs.append(x)
                 for y in ys[1:3]:
@@ -151,7 +151,7 @@ class Regsill(Source):
             for i in range(int(wi)):
                 wfake=2*np.abs(fwc-self.xcen+float(i)*wslice)
                 lfake=0
-                xs,ys,zs=self.rotate_xyz()
+                xs,ys,zs=self.rotate_xyz(lfake,wfake)
                 for x in xs[0:2]:
                     xcs.append(x)
                 for y in ys[0:2]:
@@ -203,6 +203,7 @@ class Regsill(Source):
         for i in range(len(xcs)):
             if self.typ=='open':
                 xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,op,self.strike,self.dip]
+                #print(xp)
             else:
                 xp=[xcs[i],ycs[i],-zcs[i],slength,swidth,sl,self.strike,self.dip,self.rake]
             defo=oki.forward(xp)
@@ -235,7 +236,7 @@ class Regsill(Source):
                 L[i,pos[0]]=-2
                 L[i,pos[1]]=1
                 L[i,pos[2]]=1
-        return L
+        return self.lamb*L
     
     def model(self,x,y,*ops):
         """
@@ -270,7 +271,11 @@ class Regsill(Source):
 
         ok1 = Okada(self.data)
         ok1.set_type('open')
-        xs,ys,zs=self.get_centers(0,0,0,self.length,self.width,0,0)
+        xs,ys,zs=self.get_centers()
+        
+        print('xs',xs)
+        print('ys',ys)
+        print('zs',zs)
 
         patches=[]
         fig, ax = plt.subplots()

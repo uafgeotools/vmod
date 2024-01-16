@@ -272,6 +272,12 @@ class Source:
             args=args[0:len(args)-len(self.data.comps)]
         else:
             offsets=None
+            
+        if not self.data.zs is None and 'depth' in self.parameters:
+            pos=np.argwhere(np.array(self.parameters)=='depth')[0][0]
+            print(args,pos)
+            args[pos]=self.data.zs+args[pos]
+            
         if self.data.ts is None:
             if self.data.__class__.__name__=='Tilt' and 'model_tilt' in dir(self):
                 func_tilt=lambda x,y: self.model_tilt(x,y,*args)
@@ -285,7 +291,8 @@ class Source:
         else:
             if self.data.__class__.__name__=='Tilt' and 'model_tilt_t' in dir(self):
                 func_tilt_time=lambda x,y,t: self.model_tilt_t(x,y,t,*args)
-                func_tilt.time.__name__ = 'func_tilt_time'
+                func_tilt_time.__name__ = 'func_tilt_time'
+                print('Name',func_tilt_time.__name__)
                 return self.data.from_model(func_tilt_time,offsets,unravel)
             elif 'model_t' in dir(self):
                 func_time=lambda x,y,t: self.model_t(x,y,t,*args)
