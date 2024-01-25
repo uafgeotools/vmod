@@ -44,19 +44,19 @@ class Mctigue(Source):
         print("\ty = %f" % x[1])
         print("\td = %f" % x[2])
         print("\tradius = %f" % x[3])
-        print("\tdV= %f" % x[4])
+        print("\tdP= %f" % x[4])
     
     def set_parnames(self):
         """
         Function defining the names for the parameters in the model.
         """
-        self.parameters=("xcen","ycen","depth","radius","dV")
+        self.parameters=("xcen","ycen","depth","radius","dP")
     
     # =====================
     # Forward Models
     # =====================
     
-    def model(self, x, y, xcen, ycen, d, rad, dV, nu=0.25, mu=4e9):
+    def model(self, x, y, xcen, ycen, d, rad, dP, nu=0.25, mu=4e9):
         """
         3d displacement field on surface from spherical source (McTigue, 1987)
 
@@ -67,7 +67,6 @@ class Mctigue(Source):
             ycen: y-offset of point source epicenter (m)
             d: depth to point (m)
             rad: chamber radius (m)
-            dV: change in volume (m^3)
             dP: change in pressure (Pa)
             nu: poisson's ratio for medium (default 0.25)
             mu: shear modulus for medium (Pa) (default 4e9)
@@ -80,10 +79,10 @@ class Mctigue(Source):
         # center coordinate grid on point source
         x = x - xcen
         y = y - ycen
-        if rad>d:
+        if np.sum(rad>d)>0:
             return x*np.Inf,x*np.Inf,x*np.Inf
         
-        dP = dV*mu/(np.pi*rad**3)
+        #dP = dV*mu/(np.pi*rad**3)
 
         # dimensionless scaling term
         scale = dP * d / mu
