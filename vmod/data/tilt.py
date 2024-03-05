@@ -112,7 +112,7 @@ class Tilt(Data):
         """
         self.add_errx(errx)
         self.add_erry(erry)
-        super().add_err(self,np.concatenate((errx,erry)))
+        super().add_err(np.concatenate((errx,erry)))
     
     def from_model3d(self,func,unravel=True):
         """
@@ -132,9 +132,10 @@ class Tilt(Data):
             uzx= lambda xpos: func(xpos,self.ys)[2]
             uzy= lambda ypos: func(self.xs,ypos)[2]
 
-            dx=-scipy.misc.derivative(uzx,self.xs,dx=1e-6)
-            dy=-scipy.misc.derivative(uzy,self.ys,dx=1e-6)
-        
+            dx=-scipy.misc.derivative(uzx,self.xs,dx=1e-1)
+            dy=-scipy.misc.derivative(uzy,self.ys,dx=1e-1)
+
+
         model=()
         if isinstance(self.dx,(list,np.ndarray)):
             model=(*model,dx)

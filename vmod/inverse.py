@@ -56,8 +56,9 @@ class Inverse:
         self.minresidual=1e6
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
-        
-        params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds()))
+
+        params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
+
         print(self.minresidual)
         return params
     
