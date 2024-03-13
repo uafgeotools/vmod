@@ -272,10 +272,6 @@ class Regdis(Source):
         ok1 = Okada(self.data)
         ok1.set_type('open')
         xs,ys,zs=self.get_centers()
-        
-        print('xs',xs)
-        print('ys',ys)
-        print('zs',zs)
 
         patches=[]
         fig, ax = plt.subplots()
