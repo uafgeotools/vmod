@@ -12,6 +12,7 @@ class Tilt(Data):
         errx: uncertainty in the inclination in the x-axis (radians)
         erry: uncertainty in the inclination in the y-axis (radians)
         azx: azimuth for the x-axis, the angle is positive clockwise starting from the north
+        delta: Step to calculate the derivate with finite differences
     """
     def __init__(self):
         self.names=None
@@ -20,7 +21,17 @@ class Tilt(Data):
         self.errx=None
         self.erry=None
         self.azx=None
+        self.delta=1e-6
         super().__init__()
+
+    def set_delta(self,delta):
+        """
+        Set step to calculate the derivative using finite differences
+        
+        Parameters:
+            delta (float): step
+        """
+        self.delta=delta
     
     def add_azx(self,azx):
         """
@@ -100,7 +111,7 @@ class Tilt(Data):
         """
         self.add_ux(dx)
         self.add_uy(dy)
-        super().add_data(self,np.concatenate((dx,dy)))
+        super().add_data(np.concatenate((dx,dy)))
     
     def add_err(self,errx,erry):
         """
@@ -126,16 +137,16 @@ class Tilt(Data):
         Returns:
             model (array): array containing the components
         """
+        #print(func.__name__)
         if 'tilt' in func.__name__:
             dx,dy=func(self.xs,self.ys)
         else:
             uzx= lambda xpos: func(xpos,self.ys)[2]
             uzy= lambda ypos: func(self.xs,ypos)[2]
 
-            dx=-scipy.misc.derivative(uzx,self.xs,dx=1e-1)
-            dy=-scipy.misc.derivative(uzy,self.ys,dx=1e-1)
-
-
+            dx=-scipy.misc.derivative(uzx,self.xs,dx=self.delta)
+            dy=-scipy.misc.derivative(uzy,self.ys,dx=self.delta)
+        
         model=()
         if isinstance(self.dx,(list,np.ndarray)):
             model=(*model,dx)
