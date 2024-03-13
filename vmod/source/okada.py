@@ -552,7 +552,7 @@ class Okada(Source):
         if np.cos(dip) > eps:
             K = (1 - 2 * nu) / np.cos(dip) * ((q / R) * (1 / (R + eta)) - yb / (R * (R + db)))
         else:
-            K = (1 - 2 * nu) * np.sin(dip) / (R + dp) * (xi**2 / (R * (R + dp)) - 1)
+            K = (1 - 2 * nu) * np.sin(dip) / (R + db) * (xi**2 / (R * (R + db)) - 1)
         return K
     
     def A(xieta, R):
