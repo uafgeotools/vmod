@@ -56,7 +56,7 @@ class Wellsite(Source):
         """
         Function defining the names for the parameters in the model.
         """
-        self.parameters=("xcen","ycen","depth","width","pressure","diffu","Young modulus")
+        self.parameters=("xcen","ycen","depth","width","pressure","diffu")
     
     # =====================
     # Forward Models
