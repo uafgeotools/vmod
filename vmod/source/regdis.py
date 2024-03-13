@@ -4,9 +4,9 @@ from . import Source
 from .okada import Okada
 from ..data import Gnss
 
-class Regsill(Source):
+class Regdis(Source):
     """
-    Class to represent a regularized sill using dislocation patches from Okada (1985) model.
+    Class to represent a regularized dislocation using dislocation patches from Okada (1985) model.
 
     Attributes
     ----------
