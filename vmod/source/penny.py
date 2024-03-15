@@ -56,7 +56,7 @@ class Penny(Source):
     # Forward Models
     # =====================
     
-    def model(self,x,y,xcen,ycen,d,P_G,a,nu=0.25):
+    def model(self,x,y,xcen,ycen,d,dP,a,nu=0.25):
         """
         Calculates surface deformation based on pressurized penny-shaped crack
         References: Fialko
@@ -67,8 +67,9 @@ class Penny(Source):
             xcen: x-offset of penny-shaped crack (m)
             ycen: y-offset of penny-shaped crack (m)
             d: depth to penny-shaped crack (m)
-            P_G: normalized pressure with shear modulus
+            dP: change in pressure (in terms of mu if mu=1 if not unit is Pa)
             a: radius for penny shaped crack (m)
+            mu: shear modulus for medium (Pa) (default 1)
             nu: poisson's ratio for medium
 
         Returns:
