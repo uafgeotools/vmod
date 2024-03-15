@@ -56,7 +56,7 @@ class Mctigue(Source):
     # Forward Models
     # =====================
     
-    def model(self, x, y, xcen, ycen, d, rad, dP, nu=0.25, mu=4e9):
+    def model(self, x, y, xcen, ycen, d, rad, dP, nu=0.25, mu=1):
         """
         3d displacement field on surface from spherical source (McTigue, 1987)
 
@@ -69,7 +69,7 @@ class Mctigue(Source):
             rad: chamber radius (m)
             dP: change in pressure (Pa)
             nu: poisson's ratio for medium (default 0.25)
-            mu: shear modulus for medium (Pa) (default 4e9)
+            mu: shear modulus for medium (Pa) (default 1)
         
         Returns:
             ux (array) : displacements in east in meters.
