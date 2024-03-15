@@ -75,7 +75,7 @@ class Vsphere(Source):
         """
         return model_t(x,y,0, xcen, ycen, d, rad, dP)
         
-    def model_t(self, x, y, t, xcen, ycen, d, rad, dP, tau, nu=0.25, mu=4e9):
+    def model_t(self, x, y, t, xcen, ycen, d, rad, dP, tau, nu=0.25, mu=1):
         """
         3d displacement field on surface for pressurized sphere in a viscoelastic medium (Bonafede and Ferrari, 2009)
 
@@ -87,7 +87,9 @@ class Vsphere(Source):
             ycen: y-offset of point source epicenter (m)
             d: depth to point (m)
             rad: chamber radius (m)
-            dP: change in pressure (Pa)
+            dP: change in pressure (in terms of mu if mu=1 if not unit is Pa)
+            nu: poisson's ratio for medium (default 0.25)
+            mu: shear modulus for medium (Pa) (default 1)
             
         Returns:
             ux (array) : displacements in east in meters.
