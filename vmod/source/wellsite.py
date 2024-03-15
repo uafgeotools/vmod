@@ -79,20 +79,20 @@ class Wellsite(Source):
     def dpressure(self,x,an,fn,k):
         return fn*an*np.cos(k*x)
     
-    def model_t(self, x, y, t, xcen, ycen, depth, width, P, diffu, E=5, nu=0.2):
+    def model_t(self, x, y, t, xcen, ycen, depth, width, P, diffu, mu=1, nu=0.25):
        
         """
         The function 
         
         Parameters:
-            xcen: y-offset of point source epicenter (m): []
-            ycen: y-offset of point source epicenter (m): []
-            depth: Reservoir depth (m): 
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            depth: Reservoir depth (m) 
             width: reservoir width (m)
-            P: Initial pressure (MPa): [5-50]
-            diffu: Diffusivity (m^2/s): [10^-4-10^-1]
-            E: Young's modulus (GPa): [5-15]
-            nu: Poisson ratio
+            P: Initial pressure (in terms of mu if mu=1 if not unit is Pa)
+            diffu: Diffusivity (m^2/s)
+            nu: poisson's ratio for medium (default 0.25)
+            mu: shear modulus for medium (Pa) (default 1)
         
         Returns:
             ux: the model does not compute deformation in the x-axis
@@ -100,8 +100,8 @@ class Wellsite(Source):
             uz: deformation in the vertical (m)
         """
         alpha=1
-        
-        mu=E/(2*(1+nu))
+
+        E=mu*(2*(1+nu))
         
         Lambda = (nu*E)/((1+nu)*(1-2*nu))
         
