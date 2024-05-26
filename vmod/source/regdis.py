@@ -255,7 +255,7 @@ class Regdis(Source):
         
         return ux,uy,uz
         
-    def plot_patches(self,ops):
+    def plot_patches(self,ops,colormap='viridis'):
         """
         Auxiliary function to plot the opening/slip values
         
@@ -268,10 +268,12 @@ class Regdis(Source):
         
         ln=self.ln
         wn=self.wn
-
+        
+        reg_proj = Regdis(self.data,typ=self.typ,ln=self.ln,wn=self.wn,length=self.length,width=self.width)
+        
         ok1 = Okada(self.data)
         ok1.set_type('open')
-        xs,ys,zs=self.get_centers()
+        xs,ys,zs=reg_proj.get_centers()
 
         patches=[]
         fig, ax = plt.subplots()
@@ -284,7 +286,7 @@ class Regdis(Source):
 
         # define the norm 
         norm = plt.Normalize(values.min(), values.max())
-        coll = matplotlib.collections.PatchCollection(patches, cmap='viridis',
+        coll = matplotlib.collections.PatchCollection(patches, cmap=colormap,
                                                       norm=norm, match_original = True)
 
         coll.set_array(values)
@@ -295,3 +297,17 @@ class Regdis(Source):
         plt.ylim(-self.length/2,self.length/2)
 
         plt.show()
+
+    def get_reg_sill(self,*ops):
+        xs,ys,zs=self.get_centers()
+        oks=[]
+        params=[]
+        ops = ops[0]
+        for i in range(len(xs)):
+            oki = Okada(self.data)
+            oki.set_type('open')
+        #Initial parameters [xcen,ycen,depth,length,width,opening,strike,dip]
+            oki.set_bounds(low_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0], high_bounds = [0, 0, 1e3, 1e3, 1e3,10.0,1.0,1.0])
+            oks.append(oki)
+            params+=[xs[i],ys[i],-zs[i],self.length/self.ln,self.width/self.wn,ops[i],self.strike,self.dip]
+        return oks,params
