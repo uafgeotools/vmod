@@ -311,3 +311,67 @@ class Regdis(Source):
             oks.append(oki)
             params+=[xs[i],ys[i],-zs[i],self.length/self.ln,self.width/self.wn,ops[i],self.strike,self.dip]
         return oks,params
+
+    def transform_order_natural2regdis(self,natural_array):
+        ln = self.ln
+        wn = self.wn
+        natural_matrix = natural_array.reshape((ln, wn))
+        regdis_array = np.zeros_like(natural_array)
+    
+        counter = 0
+        for base_col in range(wn // 2):
+            for base_row in range(ln // 2):
+                base_row_adjusted = ln - 1 - base_row
+                regdis_array[counter] =  natural_matrix[base_row, wn - 1 - base_col]
+                regdis_array[counter + 1] = natural_matrix[base_row, base_col]
+                regdis_array[counter + 2] = natural_matrix[base_row_adjusted, base_col]
+                regdis_array[counter + 3] = natural_matrix[base_row_adjusted, wn - 1 - base_col]
+                counter += 4
+        if wn % 2 != 0:
+            center_col = wn // 2
+            for base_row in range(ln // 2):
+                base_row_adjusted = ln - 1 - base_row
+                regdis_array[counter] = natural_matrix[base_row, center_col]
+                regdis_array[counter + 1] = natural_matrix[base_row_adjusted, center_col]
+                counter += 2
+        if ln % 2 != 0:
+            center_row = ln // 2
+            for base_col in range(wn // 2):
+                regdis_array[counter] = natural_matrix[center_row, base_col]
+                regdis_array[counter + 1] = natural_matrix[center_row, wn - 1 - base_col]
+                counter += 2
+        if wn % 2 != 0 and ln % 2 != 0:
+            regdis_array[counter] = natural_matrix[center_row, center_col]
+        return regdis_array
+
+    def transform_order_regdis2natural(self,regdis_array):
+        ln = self.ln
+        wn = self.wn
+        natural_matrix = np.zeros_like(regdis_array.reshape((ln, wn)))
+
+        counter = 0
+        for base_col in range(wn // 2):
+            for base_row in range(ln // 2):
+                base_row = wn-1 - base_row
+                natural_matrix[ln-1-base_row,wn-1-base_col] = regdis_array[counter]
+                natural_matrix[ln-1-base_row,base_col] = regdis_array[counter+1]
+                natural_matrix[base_row,base_col] = regdis_array[counter+2]
+                natural_matrix[base_row,wn-1-base_col] = regdis_array[counter+3]
+                counter += 4
+        if wn % 2 != 0:
+            center_col = wn // 2
+            for base_row in range(ln // 2):
+                base_row_adjusted = ln - 1 - base_row
+                natural_matrix[base_row_adjusted, center_col] = regdis_array[counter+1]
+                natural_matrix[base_row, center_col] = regdis_array[counter]
+                counter += 2
+        if ln % 2 != 0:
+            center_row = ln // 2
+            for base_col in range(wn // 2):
+                natural_matrix[center_row, base_col] = regdis_array[counter+1]
+                natural_matrix[center_row, wn - 1 - base_col] = regdis_array[counter]
+                counter += 2
+        if wn % 2 != 0 and ln % 2 != 0:
+            natural_matrix[center_row, center_col] = regdis_array[counter]
+        return natural_matrix.flatten()
+        
