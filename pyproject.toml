@@ -24,13 +24,13 @@ dependencies = [
     "matplotlib == 3.*",
     "numpy == 1.*",
     "pandas == 1.*",
-    "pymc == 2.3.8",
     "rasterio == 1.*",
     "scipy == 1.*",
     "scikit-image == 0.22.0",
     "utm == 0.7.0",
     "jupyterlab == 4.*",
-    "corner == 2.*"
+    "corner == 2.*",
+    "emcee == 3.*",
 ]
 
 [project.urls]

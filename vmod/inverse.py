@@ -256,7 +256,14 @@ class Inverse:
             traces (array): traces that will give the posterior distribution for the parameters
             MDL (pymc.MCMC): inversion object
         """
-        import pymc
+        try:
+            import pymc
+        except ModuleNotFoundError:
+            raise ImportError("PyMC is not installed. Please use mcmc_em instead.")
+
+        if(pymc.__version__ != "2.3.8"):
+            raise ImportError("PyMC version 2.3.8 is required. Installed PyMC version is %s" % (pymc.__version__))
+
         self.minresidual=1e6
         data=self.obs.get_data()
         errors=self.obs.get_errors()
