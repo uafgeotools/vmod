@@ -30,7 +30,7 @@ dependencies = [
     "utm == 0.7.0",
     "jupyterlab == 4.*",
     "corner == 2.*",
-    "emcee",
+    "emcee == 3.*",
     "tqdm",
     "ipympl"
 ]
