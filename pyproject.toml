@@ -20,17 +20,18 @@ authors = [
     {name = "Kyle Anderson", email = "kranderson@usgs.gov"}
 ]
 dependencies = [
-    "h5py",
-    "matplotlib",
-    "numpy",
-    "pandas",
-    "rasterio",
-    "scipy",
-    "scikit-image",
-    "utm",
-    "jupyterlab",
-    "corner",
-    "emcee",
+    "h5py == 3.*",
+    "matplotlib == 3.*",
+    "numpy == 1.*",
+    "pandas == 1.*",
+    "rasterio == 1.*",
+    "scipy == 1.*",
+    "scikit-image == 0.22.0",
+    "utm == 0.7.0",
+    "jupyterlab == 4.*",
+    "corner == 2.*",
+	"tqdm",
+	"ipympl"
 ]
 
 [project.urls]

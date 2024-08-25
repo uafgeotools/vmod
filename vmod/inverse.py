@@ -177,7 +177,7 @@ class Inverse:
         #print('likeli',np.isnan(likeli))
         return lp + likeli
     
-    def mcmc_em(self,name=None,move=None,processes=1):
+    def mcmc_em(self,name=None,move=None):
         """
         Bayesian inversion approach with multiple algorithms using the emcee library
         
