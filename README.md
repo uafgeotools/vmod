@@ -3,7 +3,9 @@
 
 # Versatile Modeling Of Deformation
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10070627.svg)](https://doi.org/10.5281/zenodo.10070627)
-
+<a target="_blank" href="https://colab.research.google.com/github/mfangaritav/vmod/blob/main/dvd_gnss_low_emcee.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
 ### Authors: Mario Angarita, Ronni Grapenthin, Scott Henderson, Michael Christoffersen and Kyle Anderson
 
 ## What is VMOD?
