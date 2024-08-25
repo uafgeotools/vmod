@@ -30,8 +30,9 @@ dependencies = [
     "utm == 0.7.0",
     "jupyterlab == 4.*",
     "corner == 2.*",
-	"tqdm",
-	"ipympl"
+    "emcee",
+    "tqdm",
+    "ipympl"
 ]
 
 [project.urls]
