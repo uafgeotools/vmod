@@ -1,4 +1,5 @@
 import copy
+import subprocess
 import numpy as np
 import sys
 import pickle
@@ -147,7 +148,7 @@ class Inverse:
         model = self.get_model(theta[0:-1])
         data = self.obs.get_data()
         diff = data - model
-        std_devs = self.obs.get_errors()
+        std_devs = self.obs.get_errors()/(10**theta[-1])
         log_std_devs = np.log(std_devs)
 
         likeli = -0.5 * (len(model) * np.log(2 * np.pi) + np.sum(2 * log_std_devs) + np.sum(((diff/std_devs) ** 2)))
@@ -176,7 +177,7 @@ class Inverse:
         #print('likeli',np.isnan(likeli))
         return lp + likeli
     
-    def mcmc_em(self,name=None,move=None):
+    def mcmc_em(self,name=None,move=None,processes=1):
         """
         Bayesian inversion approach with multiple algorithms using the emcee library
         
@@ -216,6 +217,9 @@ class Inverse:
             moves=emcee.moves.DESnookerMove()
         elif move=='redblue':
             moves=emcee.moves.RedBlueMove()
+
+        if name is None:
+            name='mcmc'
         
         backend = emcee.backends.HDFBackend(name+'.h5')
         backend.reset(nwalkers, ndim)
@@ -225,10 +229,14 @@ class Inverse:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability, pool=pool, backend=backend)
             else:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, self.log_probability, pool=pool,moves=moves, backend=backend)
-            sampler.run_mcmc(pos, int(steps/nwalkers),skip_initial_state_check=True, progress=True)
-        
-        traces = sampler.get_chain(discard=int(burnin/nwalkers), thin=int(thin/nwalkers), flat=True)
-        
+            try:
+                sampler.run_mcmc(pos, int(steps/nwalkers),skip_initial_state_check=True, progress=True)
+                traces = sampler.get_chain(discard=int(burnin/nwalkers), thin=int(thin/nwalkers), flat=True)
+            except KeyboardInterrupt:
+                print('Inversion interrupted')
+                reader = emcee.backends.HDFBackend(name+'.h5')
+                traces = reader.get_chain(discard=int(burnin/nwalkers), thin=int(thin/nwalkers), flat=True)
+
         traces=traces.T.tolist()[0:-1]
         
         traces,labels=self.traces2lin(traces)
@@ -242,6 +250,7 @@ class Inverse:
         
         with open(name+'.pkl', 'wb') as f:
             pickle.dump(solution, f)
+        subprocess.call('rm -rf '+name+'.h5',shell=True)
         
         return traces
     

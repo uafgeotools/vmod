@@ -20,7 +20,6 @@ from scipy import stats
 from scipy.interpolate import interp1d
 from skimage.restoration import denoise_nl_means, estimate_sigma
 
-
 def cart2pol(x1,x2):
     """
     Converts cartesian coordinates to polar coordinates
@@ -164,7 +163,7 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     """
     patch_kw = dict(patch_size=5,      # 5x5 patches
                     patch_distance=15,  # 13x13 search area
-                    multichannel=True)
+                    )
 
     imcp=np.copy(im)
     imcp[np.isnan(im)]=0
@@ -895,12 +894,10 @@ class AOI_Selector:
                 toggle_selector.RS.set_active(True)
 
         toggle_selector.RS = RectangleSelector(self.current_ax, self.line_select_callback,
-                                               drawtype=drawtype, useblit=True,
+                                               useblit=True,
                                                button=[1, 3],  # don't use middle button
                                                minspanx=0, minspany=0,
                                                spancoords='pixels',
-                                               rectprops = dict(facecolor='red', edgecolor = 'yellow',
-                                                                alpha=0.3, fill=True),
                                                interactive=True)
         plt.connect('key_press_event', toggle_selector)
 

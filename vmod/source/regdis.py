@@ -269,14 +269,14 @@ class Regdis(Source):
         ln=self.ln
         wn=self.wn
 
-        ok1 = Okada(self.data)
-        ok1.set_type('open')
-        xs,ys,zs=self.get_centers()
+        reg_proj = Regdis(self.data,typ=self.typ,ln=self.ln,wn=self.wn,length=self.length,width=self.width)
+
+        xs,ys,zs=reg_proj.get_centers()
 
         patches=[]
         fig, ax = plt.subplots()
         for i in range(len(xs)):
-            rect = matplotlib.patches.Rectangle((xs[i]-self.length/(2*ln),ys[i]-self.width/(2*wn)), self.length/ln, self.width/wn)
+            rect = matplotlib.patches.Rectangle((xs[i]-self.width/(2*wn),ys[i]-self.length/(2*ln)), self.width/wn, self.length/ln)
             patches.append(rect)
 
         # values as numpy array
