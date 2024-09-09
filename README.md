@@ -45,7 +45,7 @@ The inversions can include one or multiple data types in the inversion and the m
 
 We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
-conda env create --file=environment.yaml
+conda env create --file=environment.yml
 ```
 Then, activate the environment and install VMOD from PyPi.
 
