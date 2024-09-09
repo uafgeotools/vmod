@@ -70,7 +70,7 @@ class Yang(Source):
     # Forward Models
     # =====================
     
-    def model(self,x,y,xcen=0,ycen=0,z0=5e3,P=10,a=2,b=1,phi=0,theta=0,mu=9.6e9,nu=0.25):
+    def model(self,x,y,xcen=0,ycen=0,z0=5e3,P=1e-3,a=2,b=1,phi=0,theta=0,mu=1,nu=0.25):
         """
         Computes surface deformation due to a prolate spheroid pressurized chamber in elastic half-space
         Yang et al., vol 93, JGR, 4249-4257, 1988)     
@@ -98,8 +98,8 @@ class Yang(Source):
         d_crita = a * np.sin(np.deg2rad(theta))
         d_critb = b * np.cos(np.deg2rad(theta))
         
-        nans=np.array([x*np.nan,x*np.nan,x*np.nan])
-        if d_crita>=z0 or b>=z0:
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if d_crita>=z0 or b>=z0 or a<=0 or b<=0:
             return nans
         if theta==0:
             theta=0.1
@@ -154,7 +154,7 @@ class Yang(Source):
 
         return U1,U2,U3
     
-    def model_depth(self,x,y,z,xcen=0,ycen=0,z0=5e3,P=10,a=2,b=1,phi=0,theta=0,mu=9.6e9,nu=0.25):
+    def model_depth(self,x,y,z,xcen=0,ycen=0,z0=5e3,P=1e-3,a=2,b=1,phi=0,theta=0,mu=1,nu=0.25):
         """
         Computes deformation at depth due to a prolate spheroid pressurized chamber in elastic half-space
         Yang et al., vol 93, JGR, 4249-4257, 1988)     

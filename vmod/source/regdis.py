@@ -62,7 +62,10 @@ class Regdis(Source):
         Initial guess for the openings/slips
         """
         self.get_parnames()
-        self.x0=[x0]*(self.ln*self.wn)
+        if isinstance(x0, np.ndarray) or isinstance(x0, list):
+            self.x0=x0
+        else:
+            self.x0=[x0]*(self.ln*self.wn)
     
     def set_bounds(self,low_bound,high_bound):
         """
@@ -272,8 +275,7 @@ class Regdis(Source):
         reg_proj = Regdis(self.data,typ=self.typ,ln=self.ln,wn=self.wn,length=self.length,width=self.width)
         
         xs,ys,zs=reg_proj.get_centers()
-        print('xs',xs)
-        print('ys',ys)
+        
         patches=[]
         fig, ax = plt.subplots()
         for i in range(len(xs)):
@@ -294,6 +296,8 @@ class Regdis(Source):
 
         plt.xlim(-self.width/2,self.width/2)
         plt.ylim(-self.length/2,self.length/2)
+        plt.xlabel('X(m)')
+        plt.ylabel('Y(m)')
 
         plt.show()
 

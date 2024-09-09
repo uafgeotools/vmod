@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import scipy
 from ..data import Data
 
@@ -115,6 +116,25 @@ class Source:
             ts (list): times for the observations.
         """
         return self.data.ts
+
+    def draw_x0(self):
+        """
+        Function to draw a combination of parameters that are valid
+        
+        Returns:
+            x0 (list): List of parameters.
+        """
+        novalid = True
+        while(novalid):
+            x0 = []
+            for i in range(self.get_num_params()):
+                low = float(self.low_bounds[i])
+                high = float(self.high_bounds[i])
+                x0.append(random.uniform(low,high))
+            ux,uy,uz = self.model(np.array([1]),np.array([1]),*x0)
+            if np.sum(ux)<1e4:
+                novalid = False
+        return x0
     
     def get_zs(self):
         """
@@ -275,7 +295,8 @@ class Source:
             
         if not self.data.zs is None and 'depth' in self.parameters:
             pos=np.argwhere(np.array(self.parameters)=='depth')[0][0]
-            print(args,pos)
+            if isinstance(args, np.ndarray):
+                args=args.tolist()
             args[pos]=self.data.zs+args[pos]
             
         if self.data.ts is None:

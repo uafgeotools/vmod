@@ -56,7 +56,7 @@ class Penny(Source):
     # Forward Models
     # =====================
     
-    def model(self,x,y,xcen,ycen,d,dP,a,nu=0.25):
+    def model(self,x,y,xcen,ycen,d,dP,a,mu=1,nu=0.25):
         """
         Calculates surface deformation based on pressurized penny-shaped crack
         References: Fialko
@@ -78,8 +78,12 @@ class Penny(Source):
             uz (array) : displacements in vertical in meters.
         """
 
-        #
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if np.sum(d<=0)>0 or a<=0:
+            return nans
         rd=np.copy(a)
+
+        P_G = dP/mu
 
         # Center coordinate grid on point source, normalized by radius
         x = (x - xcen) / rd
@@ -123,7 +127,7 @@ class Penny(Source):
 
         return np.array([ux,uy,uz])
     
-    def model_depth(self,x,y,z,xcen,ycen,d,P,a,mu=1e10,nu=0.25):
+    def model_depth(self,x,y,z,xcen,ycen,d,dP,a,mu=1,nu=0.25):
         """
         Calculates deformation at depth based on pressurized penny-shaped crack
         References: Fialko
@@ -135,7 +139,7 @@ class Penny(Source):
             xcen: x-offset of penny-shaped crack (m)
             ycen: y-offset of penny-shaped crack (m)
             d: depth to penny-shaped crack (m)
-            P: pressure (Pa)
+            dP: change in pressure (in terms of mu if mu=1 if not unit is Pa)
             a: radius penny-shaped crack (Pa)
             mu: shear modulus (Pa)
             nu: poisson's ratio for medium
@@ -145,7 +149,7 @@ class Penny(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
-        P_G=P/mu
+        P_G=dP/mu
 
         #
         rd=np.copy(a)

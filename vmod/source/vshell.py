@@ -98,6 +98,10 @@ class Vshell(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if rad1<=0 or rad2<=0 or rad2<=rad1 or np.sum(d<=0)>0 or tau<=0:
+            return nans
+
         x = x - xcen
         y = y - ycen
         

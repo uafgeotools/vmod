@@ -1,0 +1,20 @@
+name: vmod-test
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.10
+  - ipykernel
+  - h5py
+  - matplotlib
+  - numpy
+  - pandas
+  - rasterio
+  - scipy
+  - scikit-image
+  - utm
+  - jupyterlab
+  - corner
+  - emcee
+  - tqdm
+  - ipympl

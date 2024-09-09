@@ -82,18 +82,21 @@ class Nish(Source):
         else:
             c1=d-h/2
             c1[c1<0]=0
+
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if d<=0 or a<=0 or h<=0:
+            return nans
+
         c2=d+h/2
-        #m=dP*a**2/mu
-        m=1
-        #m=1+h
+        m=dP*a**2/mu
+        
         r=np.sqrt(x**2+y**2)
         R2=np.sqrt(r**2+c2**2)
         R1=np.sqrt(r**2+c1**2)
         angle=np.arctan2(y,x)
         g=9.8
-        #s=(dP/(c2-c1)-rho*g)*a**2/(4*mu)
-        s=0
-
+        s=(dP/(c2-c1)-rho*g)*a**2/(4*mu)
+        
         urn=(m*r/(c2-c1))*(0.5*(c2**2/R2**3-c1**2/R1**3)+(c1/(2*r**2))*(c2**3/R2**3-c1**3/R1**3)-nu*(1/R2-1/R1)-((1+nu)*c1/r**2)*(c2/R2-c1/R1))
         urs=s*r*(1/R1-1/R2-(2*nu-1)*(1/(R2+c2)-1/(R1+c1)))
         ur= urn+urs

@@ -1,17 +1,20 @@
 import copy
-import subprocess
-import numpy as np
-import sys
+import os
 import pickle
+import random
+import string
+import subprocess
+import sys
+import time
 from multiprocessing import Pool
+
+import numpy as np
+from tqdm import tqdm
 from scipy.optimize import least_squares
 from scipy.optimize import basinhopping
 from scipy.optimize import differential_evolution
 from scipy.optimize import shgo
-import random
-import string
-import time
-import os
+
 
 os.environ["OMP_NUM_THREADS"] = "1"
 
@@ -47,7 +50,7 @@ class Inverse:
         self.sources.append(source)
 
     #interface to scipy bounded nonlinear least squares implementation
-    def nlsq(self):
+    def nlsq(self, iter=64):
         """
         Non-linear least squares approach using the trust reflective algorithm
         
@@ -58,10 +61,17 @@ class Inverse:
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
 
-        params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
+        for i in tqdm(range(iter)):
+            try:
+                params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
+            except ValueError:
+                continue
 
-        print(self.minresidual)
-        return params
+        j=0
+        for s in self.sources:
+            s.set_x0(self.minparms[j:j+s.get_num_params()])
+            j+=s.get_num_params()
+        return self.minparms
     
     def bh(self):
         """
@@ -145,17 +155,39 @@ class Inverse:
         Returns:
             likeli (float): logarithm of the likelihood 
         """
-        model = self.get_model(theta[0:-1])
         data = self.obs.get_data()
+        errors = self.obs.get_errors()
+        inilen = len(data)
+
+        #############THIS PART IS FOR REGULARIZATION#################
+        reg=False
+        for source in self.sources:
+            if source.reg:
+                reg=True
+                break
+
+        if reg:
+            data=data.tolist()
+            errors=errors.tolist()
+            for source in self.sources:
+                if source.reg:
+                    data+=[0.0 for i in range(source.get_num_params())]
+                    errors+=[1.0 for i in range(source.get_num_params())]
+            data=np.array(data)
+            errors=np.array(errors)
+        #############THIS PART IS FOR REGULARIZATION#################
+
+        model = self.get_model(theta[0:-1])
         diff = data - model
-        std_devs = self.obs.get_errors()/(10**theta[-1])
+        std_devs = copy.copy(errors)
+        std_devs[0:inilen] = std_devs[0:inilen]/(10**theta[-1])
         log_std_devs = np.log(std_devs)
 
         likeli = -0.5 * (len(model) * np.log(2 * np.pi) + np.sum(2 * log_std_devs) + np.sum(((diff/std_devs) ** 2)))
-        
+
         if np.isnan(likeli):
             return -np.inf
-        
+
         return likeli
     
     def log_probability(self,theta):
@@ -197,8 +229,6 @@ class Inverse:
                 low,high,ini=self.par2log(source,i)
                 inis.append(ini)
         inis.append(0.0)
-        
-        print(inis)
         
         steps,burnin,thin=self.get_numsteps()
         
@@ -546,8 +576,8 @@ class Inverse:
         x0 = []
         
         for s in self.sources:
-            x0 = np.concatenate((x0, s.x0))
-
+            sx0 = s.draw_x0()
+            x0 = np.concatenate((x0, sx0))
         return x0
 
     #high and low bounds for the parameters

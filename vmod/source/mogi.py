@@ -78,6 +78,9 @@ class Mogi(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if d<=0:
+            return nans
         # Center coordinate grid on point source
         x = x - xcen
         y = y - ycen
@@ -118,7 +121,9 @@ class Mogi(Source):
             dx (array) : inclination in the x-axis in radians.
             dy (array) : inclination in the y-axis in radians.
         """
-        
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if d<=0:
+            return nans
         # Center coordinate grid on point source
         x = x - xcen
         y = y - ycen

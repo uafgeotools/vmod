@@ -99,6 +99,10 @@ class Wellsite(Source):
             uy: the model does not compute deformation in the y-axis
             uz: deformation in the vertical (m)
         """
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if depth<=0 or width<=0 or diffu<=0:
+            return nans
+
         alpha=1
 
         E=mu*(2*(1+nu))

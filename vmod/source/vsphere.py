@@ -96,6 +96,10 @@ class Vsphere(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if np.sum(d<=0)>0 or rad<=0 or tau<=0:
+            return nans
+        
         a=rad
         K=5*mu/3
         
@@ -103,7 +107,7 @@ class Vsphere(Source):
         y = y - ycen
         
         if rad>d:
-            return x*np.Inf,x*np.Inf,x*np.Inf
+            return x*0+1e6,x*0+1e6,x*0+1e6
         
         th, r = util.cart2pol(x,y)
         A=1+2*(mu/K)

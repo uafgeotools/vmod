@@ -79,9 +79,10 @@ class Mctigue(Source):
         # center coordinate grid on point source
         x = x - xcen
         y = y - ycen
-        if np.sum(rad>d)>0:
-            return x*np.Inf,x*np.Inf,x*np.Inf
-        
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if np.sum(d<=0)>0 or rad<=0 or np.sum(rad>d)>0:
+            return nans
+
         #dP = dV*mu/(np.pi*rad**3)
 
         # dimensionless scaling term
@@ -137,8 +138,9 @@ class Mctigue(Source):
         # center coordinate grid on point source
         x = x - xcen
         y = y - ycen
-        if rad>d:
-            return x*np.Inf,x*np.Inf,x*np.Inf
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        if np.sum(d<=0)>0 or rad<=0 or np.sum(rad>d)>0:
+            return nans
         
         dP = dV*mu/(np.pi*rad**3)
 

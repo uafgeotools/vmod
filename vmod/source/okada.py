@@ -186,11 +186,13 @@ class Okada(Source):
         d_crit = width/2 * np.sin(np.deg2rad(dip))
         
         if tilt:
-            nans=np.array([e*np.nan,e*np.nan])
+            nans=np.array([e*0+1e6,e*0+1e6])
         else:
-            nans=np.array([e*np.nan,e*np.nan,e*np.nan])
-        
-        if depth<d_crit:
+            nans=np.array([e*0+1e6,e*0+1e6,e*0+1e6])
+
+        if np.sum(d<=0)>0:
+            return nans
+        if np.sum(depth<d_crit)>0:
             return nans
         elif length<0:
             return nans
