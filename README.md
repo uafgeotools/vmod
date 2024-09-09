@@ -3,7 +3,7 @@
 
 # Versatile Modeling Of Deformation
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10070627.svg)](https://doi.org/10.5281/zenodo.10070627)
-<a target="_blank" href="https://colab.research.google.com/github/mfangaritav/vmod/blob/main/dvd_gnss_low_emcee.ipynb">
+<a target="_blank" href="https://colab.research.google.com/github/uafgeotools/vmod/blob/main/dvd_gnss_low.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 ### Authors: Mario Angarita, Ronni Grapenthin, Scott Henderson, Michael Christoffersen and Kyle Anderson
@@ -45,9 +45,9 @@ The inversions can include one or multiple data types in the inversion and the m
 
 We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
-conda create --name vmod -c conda-forge "python=3.9.*" "pymc=2.3.8" "setuptools>=61"
+conda env create --file=environment.yaml
 ```
-PyMC must be installed with conda, pip fails to build version 2.3.8 on some machines.
+Then, activate the environment and install VMOD from PyPi.
 
 ```console
 conda activate vmod
@@ -56,7 +56,7 @@ pip install vmod-geodesy
 
 ## Run an inversion:
 
-In this repository we included several notebooks to show the steps necessary to run an inversion using [GNSS](dvd_gnss_low.ipynb), [InSAR](dvd_insar_low_off.ipynb), [EDM](example_synthetic_edm.ipynb) and [joint](dvd_joint_low.ipynb) datasets. We also included an example using real datasets on [Unimak Island](example_unimak_joint.ipynb).
+In this repository we included several notebooks to show the steps necessary to run an inversion using [GNSS](dvd_gnss_low.ipynb), [InSAR](dvd_insar_high.ipynb), and [joint](unimak_joint.ipynb) datasets. We also included an example for an InSAR dataset on [Unimak Island](unimak_insar.ipynb).
 
 ## Add new datatype:
 
