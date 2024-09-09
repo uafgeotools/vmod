@@ -1,4 +1,4 @@
-name: vmod-test
+name: vmod
 channels:
   - conda-forge
   - nodefaults
