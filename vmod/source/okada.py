@@ -190,7 +190,7 @@ class Okada(Source):
         else:
             nans=np.array([e*0+1e6,e*0+1e6,e*0+1e6])
 
-        if np.sum(d<=0)>0:
+        if np.sum(depth<=0)>0:
             return nans
         if np.sum(depth<d_crit)>0:
             return nans
