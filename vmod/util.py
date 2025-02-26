@@ -507,7 +507,7 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
         cmap=plt.cm.jet
         im=ax.imshow(dataset,cmap=cmap,extent=extent,vmin=vmin, vmax=vmax)
 
-    if np.mean(np.abs(self.extent))<=180:
+    if np.mean(np.abs(extent))<=180:
         ax.set_ylabel('Latitude (°)')
         ax.set_xlabel('Longitude (°)')
     else:
