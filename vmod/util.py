@@ -458,7 +458,7 @@ def get_closest_point(row,col,dataset):
         row,col=np.unravel_index(np.nanargmin(dif), dif.shape)
         return row,col
     
-def read_dataset_h5(h5file,key,plot=True,aoi=None):
+def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     """
     Reads and plots the output from mintpy 
     
@@ -472,10 +472,13 @@ def read_dataset_h5(h5file,key,plot=True,aoi=None):
         dataset (array): matrix that represents the dataset
     """
     h5f=h5py.File(h5file)
-    dataset=h5f[key][:]
+    if index is None:
+        dataset=h5f[key][:]
+    else:
+        dataset=h5f[key][:][index,:,:]
     
-    lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2'])]
-    lats=[float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])]
+    lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
+    lats=[float(h5f.attrs['LAT_REF1']), float(h5f.attrs['LAT_REF2']),float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
     
     lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
     #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
@@ -503,8 +506,13 @@ def read_dataset_h5(h5file,key,plot=True,aoi=None):
     else:
         cmap=plt.cm.jet
         im=ax.imshow(dataset,cmap=cmap,extent=extent,vmin=vmin, vmax=vmax)
-    ax.set_ylabel('Latitude (°)')
-    ax.set_xlabel('Longitude (°)')
+
+    if np.mean(np.abs(self.extent))<=180:
+        ax.set_ylabel('Latitude (°)')
+        ax.set_xlabel('Longitude (°)')
+    else:
+        ax.set_ylabel('North (m)')
+        ax.set_xlabel('East (m)')
     plt.colorbar(im,orientation='horizontal')
     print(extent)
     return dataset
@@ -697,22 +705,24 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     else:
         sc=scl/100
         hmax=2*sc
+        vmax=4*sc
         scale=ratio*extent/hmax
+        vscale=ratio*extent/vmax
     logsc=scale/10**int(np.log10(scale))
     ax = plt.gca()
     for i in range(len(xs)):
         plt.annotate("", xy=(xs[i]/norm+uxs[i]*scale, ys[i]/norm+uys[i]*scale), xytext=(xs[i]/norm, ys[i]/norm),arrowprops=dict(arrowstyle="->",color="red"))
         if not (euxs is None and euys is None):
             ax.add_patch(Ellipse(xy=(xs[i]/norm+uxs[i]*scale, ys[i]/norm+uys[i]*scale), width=euxs[i]*scale*2, height=euys[i]*scale*2, color="grey", fill=False, lw=2))
-        plt.annotate("", xy=(xs[i]/norm, ys[i]/norm+uzs[i]*scale), xytext=(xs[i]/norm, ys[i]/norm),arrowprops=dict(arrowstyle="-",color="black"))
+        plt.annotate("", xy=(xs[i]/norm, ys[i]/norm+uzs[i]*vscale), xytext=(xs[i]/norm, ys[i]/norm),arrowprops=dict(arrowstyle="-",color="black"))
         if names is not None:
             plt.annotate(names[i], xy=(xs[i]/norm, ys[i]/norm-0.05*(limsy[1]-limsy[0])), xytext=(xs[i]/norm, ys[i]/norm-0.05*(limsy[1]-limsy[0])),color='blue')
     if euzs is not None:
-        plt.errorbar(xs/norm,ys/norm+uzs*scale,euzs*scale,fmt='bo',ms=1)
+        plt.errorbar(xs/norm,ys/norm+uzs*vscale,euzs*vscale,fmt='bo',ms=1)
     plt.annotate("", xy=(sposx+sc*scale, sposy), xytext=(sposx, sposy),arrowprops=dict(arrowstyle="->",color="red"))
     plt.annotate(str(scl)+r"cm/yr", xy=(sposx, sposy1), xytext=(sposx, sposy1),color='red')
     
-    plt.annotate("", xy=(sposx, sposy2+sc*scale), xytext=(sposx, sposy2),arrowprops=dict(arrowstyle="-",color="black"))
+    plt.annotate("", xy=(sposx, sposy2+sc*vscale), xytext=(sposx, sposy2),arrowprops=dict(arrowstyle="-",color="black"))
     plt.annotate(str(scl)+r"cm/yr", xy=(sposx, sposy2), xytext=(sposx, sposy2),color='black')
     if unit=='m':
         plt.ylabel('Y(km)')
@@ -802,11 +812,12 @@ class AOI_Selector:
     def __init__(self,
                  h5file,
                  key,
-                 coh=None,cohth=0,
+                 index=None,
+                 wvl=None,
+                 coh=None,cohth=0,ref_date=None,
                  fig_xsize=None, fig_ysize=None,
                  cmap=plt.cm.gist_gray,
-                 vmin=None, vmax=None,
-                 drawtype='box'
+                 vmin=None, vmax=None
                 ):
         
         h5f=h5py.File(h5file)
@@ -817,7 +828,13 @@ class AOI_Selector:
                 print('The possible dates are:',dates)
                 timeseries=h5f['timeseries'][:]
                 if key in dates:
-                    velocity=timeseries[dates==key][0]
+                    if ref_date:
+                        if ref_date in dates:
+                            velocity=timeseries[dates==key][0]-timeseries[dates==ref_date][0]
+                        else:
+                            print('The reference date was not found!!')
+                    else:
+                        velocity=timeseries[dates==key][0]
                 else:
                     print('The date was not found in this dataset')
                     velocity=timeseries[-1]
@@ -825,15 +842,19 @@ class AOI_Selector:
                 raise Exception('The dataset does not exist in this file')
         else:
             if key in keys:
-                velocity=h5f[key][:]
+                if index is None:
+                    velocity=h5f[key][:]
+                else:
+                    velocity=h5f[key][:][index,:,:]
             else:
                 try:
                     velocity=h5f['velocity'][:]
                 except:
                     raise Exception('This dataset does not have LOS deformation')
-                    
-        lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2'])]
-        lats=[float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])]
+        if not wvl is None:
+            velocity=velocity*wvl/(-4*np.pi)
+        lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
+        lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
         lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
         #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
         self.wl=float(h5f.attrs['WAVELENGTH'])
@@ -876,9 +897,13 @@ class AOI_Selector:
         else:
             self.cmap=plt.cm.jet
             im=self.current_ax.imshow(self.image, cmap=plt.cm.jet, extent=self.extent, vmin=self.vmin, vmax=self.vmax)
-        
-        self.current_ax.set_ylabel('Latitude (°)')
-        self.current_ax.set_xlabel('Longitude (°)')
+
+        if np.mean(np.abs(self.extent))<=180:
+            self.current_ax.set_ylabel('Latitude (°)')
+            self.current_ax.set_xlabel('Longitude (°)')
+        else:
+            self.current_ax.set_ylabel('North (m)')
+            self.current_ax.set_xlabel('East (m)')
         plt.colorbar(im,orientation='horizontal')
 
         def toggle_selector(self, event):
@@ -893,8 +918,7 @@ class AOI_Selector:
                 print(' RectangleSelector activated.')
                 toggle_selector.RS.set_active(True)
 
-        toggle_selector.RS = RectangleSelector(self.current_ax, self.line_select_callback,
-                                               useblit=True,
+        toggle_selector.RS = RectangleSelector(self.current_ax, self.line_select_callback, useblit=True,
                                                button=[1, 3],  # don't use middle button
                                                minspanx=0, minspany=0,
                                                spancoords='pixels',
@@ -950,20 +974,26 @@ class Ref_Insar_Selector_Pre:
             row1,col1=ll2rc(aoi.x1,aoi.y2,extent,velocity.shape)
             row2,col2=ll2rc(aoi.x2,aoi.y1,extent,velocity.shape)
             self.extent=[aoi.x1,aoi.x2,aoi.y1,aoi.y2]
+
+        import ipywidgets as widgets
+        out = widgets.Output()
         
         self.dataset=np.copy(velocity[row1:row2,col1:col2])
         fig, ax = plt.subplots()
-        
         fig.suptitle('Reference Selector', fontsize=16)
         
         im=ax.imshow(self.dataset,cmap=aoi.cmap,extent=self.extent,vmin=aoi.vmin, vmax=aoi.vmax)
         line,=ax.plot([], [],'ko')
-        
-        ax.set_ylabel('Latitude (°)')
-        ax.set_xlabel('Longitude (°)')
+
+        if np.mean(np.abs(self.extent))<=180:
+            ax.set_ylabel('Latitude (°)')
+            ax.set_xlabel('Longitude (°)')
+        else:
+            ax.set_ylabel('North (m)')
+            ax.set_xlabel('East (m)')
 
         plt.colorbar(im,orientation='horizontal')
-
+        
         def on_click(event):
             """
             Captures the coordinates when a user click on the plot
@@ -971,17 +1001,27 @@ class Ref_Insar_Selector_Pre:
             row,col=ll2rc(event.xdata,event.ydata,self.extent,self.dataset.shape)
             
             row,col=get_closest_point(row,col,self.dataset)
-            line.set_xdata(event.xdata)
-            line.set_ydata(event.ydata)
+
+            #line.set_xdata(event.xdata)
+            #line.set_ydata(event.ydata)
             
             self.xref=event.xdata
             self.yref=event.ydata
             
             self.dataset-=self.dataset[row,col]
-            
-            im.set_data(self.dataset)
+            ax.clear()
+            ax.imshow(self.dataset,cmap=aoi.cmap,extent=self.extent,vmin=aoi.vmin, vmax=aoi.vmax)
+            ax.plot([self.xref],[self.yref],'ko')
+            if np.mean(np.abs(self.extent))<=180:
+                ax.set_ylabel('Latitude (°)')
+                ax.set_xlabel('Longitude (°)')
+            else:
+                ax.set_ylabel('North (m)')
+                ax.set_xlabel('East (m)')
+            #im.set_data(self.dataset)
 
         plt.connect('button_press_event', on_click)
+        #cid=fig.canvas.mpl_connect('button_press_event', on_click)
 
         plt.show()
         
@@ -1020,14 +1060,21 @@ class Ref_Insar_Selector:
         fig.suptitle('Reference Selector', fontsize=16)
         
         if vmin is None:
-            im=ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=-np.nanmax(np.abs(velocity)), vmax=np.nanmax(np.abs(velocity)))
+            self.vmin=-np.nanmax(np.abs(velocity))
+            self.vmax=np.nanmax(np.abs(velocity))
         else:
-            im=ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=vmin, vmax=vmax)
+            self.vmin=vmin
+            self.vmax=vmax
+        im=ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=self.vmin, vmax=self.vmax)
         #line,=ax.plot([refcoords[0]], [refcoords[1]],'ko',label='Reference')
         line,=ax.plot([ref[0]], [ref[1]],'ko',label='Reference')
         
-        ax.set_ylabel('Latitude (°)')
-        ax.set_xlabel('Longitude (°)')
+        if np.mean(np.abs(self.extent))<=180:
+            ax.set_ylabel('Latitude (°)')
+            ax.set_xlabel('Longitude (°)')
+        else:
+            ax.set_ylabel('North (m)')
+            ax.set_xlabel('East (m)')
 
         plt.colorbar(im,orientation='horizontal')
 
@@ -1035,15 +1082,24 @@ class Ref_Insar_Selector:
             row,col=ll2rc(event.xdata,event.ydata,self.extent,self.dataset.shape)
             
             row,col=get_closest_point(row,col,self.dataset)
-            line.set_xdata(event.xdata)
-            line.set_ydata(event.ydata)
+            #line.set_xdata(event.xdata)
+            #line.set_ydata(event.ydata)
             
             self.xref=event.xdata
             self.yref=event.ydata
             
             self.dataset-=self.dataset[row,col]
             
-            im.set_data(self.dataset)
+            #im.set_data(self.dataset)
+            ax.clear()
+            ax.imshow(self.dataset,cmap='jet',extent=self.extent,vmin=self.vmin, vmax=self.vmax)
+            ax.plot([self.xref],[self.yref],'ko')
+            if np.mean(np.abs(self.extent))<=180:
+                ax.set_ylabel('Latitude (°)')
+                ax.set_xlabel('Longitude (°)')
+            else:
+                ax.set_ylabel('North (m)')
+                ax.set_xlabel('East (m)')
             
             self.los-=self.dataset[row,col]
             
