@@ -89,14 +89,36 @@ class Insar(Data):
             azs=np.radians(azs)
             lks=np.radians(lks)
         self.add_vecs(azs,lks)
-        self.add_lls(lons,lats,ori)
+        if -180<=np.mean(lons)<=180 and -90<=np.mean(lats)<=90:
+            self.add_lls(lons,lats,ori)
+        else:
+            xs=lons
+            ys=lats
+            if ori is None:
+                self.add_xs(xs-np.mean(xs))
+                self.add_ys(ys-np.mean(ys))
+            else:
+                self.add_xs(xs-ori[0])
+                self.add_ys(ys-ori[1])
         self.add_los(los)
         self.add_err(elos)
         if ref is not None:
             if len(ref)==2:
-                orix,oriy,z1sor,z2sor=util.ll2utm([ori[0]],[ori[1]])
-                refx,refy,z1sor,z2sor=util.ll2utm([ref[0]],[ref[1]],z1=z1sor,z2=z2sor)
-                ref=[refx[0]-orix[0],refy[0]-oriy[0],orix[0],oriy[0],str(z1sor)+str(z2sor)]
+                if -180<=np.mean(lons)<=180 and -90<=np.mean(lats)<=90:
+                    orix,oriy,z1sor,z2sor=util.ll2utm([ori[0]],[ori[1]])
+                    refx,refy,z1sor,z2sor=util.ll2utm([ref[0]],[ref[1]],z1=z1sor,z2=z2sor)
+                    zone=str(z1sor)+str(z2sor)
+                    refx=refx[0]
+                    refy=refy[0]
+                    orix=orix[0]
+                    oriy=oriy[0]
+                else:
+                    refx=ref[0]
+                    refy=ref[1]
+                    orix=ori[0]
+                    oriy=ori[1]
+                    zone=None
+                ref=[refx-orix,refy-oriy,orix,oriy,zone]
             self.add_ref(ref)
         
     def from_model3d(self,func,unravel=True):
