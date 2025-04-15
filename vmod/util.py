@@ -2,20 +2,23 @@
 """
 General utility functions to accompany vmod
 """
-import numpy as np
-import numpy.ma as ma
 import time
 import math
 import os
 import subprocess
-import utm
-from matplotlib.widgets import RectangleSelector
-import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
+
 import h5py
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import numpy.ma as ma
+import rasterio
+import utm
+
 from IPython.display import Markdown
 from IPython.display import display
-import matplotlib
+from matplotlib.widgets import RectangleSelector
+from matplotlib.patches import Ellipse
 from scipy import stats
 from scipy.interpolate import interp1d
 from skimage.restoration import denoise_nl_means, estimate_sigma
@@ -167,7 +170,13 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
 
     imcp=np.copy(im)
     imcp[np.isnan(im)]=0
-    
+
+    if isinstance(az, np.ndarray) and isinstance(inc, np.ndarray):
+        pass
+    elif (isinstance(az, float) or isinstance(az, int)) and (isinstance(inc, float) or isinstance(inc, int)):
+        pass
+    else:
+        raise Exception('Azimuth or Incidence not in the right format')
     
     if denoise:
         imfil=denoise_nl_means(imcp, h=0.6 * 0.5, sigma=0.5, fast_mode=True, **patch_kw)
@@ -228,8 +237,12 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     ycoords=np.linspace(extent[2],extent[3],im.shape[0])[::-1]
     for i,fvert in enumerate(fverts):
         mean=np.nanmean(im[fvert[0]:fvert[1],fvert[2]:fvert[3]])
-        azmean=np.nanmean(az[fvert[0]:fvert[1],fvert[2]:fvert[3]])
-        incmean=np.nanmean(inc[fvert[0]:fvert[1],fvert[2]:fvert[3]])
+        if isinstance(az, np.ndarray) and isinstance(inc, np.ndarray):
+            azmean=np.nanmean(az[fvert[0]:fvert[1],fvert[2]:fvert[3]])
+            incmean=np.nanmean(inc[fvert[0]:fvert[1],fvert[2]:fvert[3]])
+        else:
+            azmean=az
+            incmean=inc
         std=calc_std(im,fvert)
         line="%6.3f %6.3f %1.6f %1.6f %1.6f %1.9f %5.0f %5.0f %5.0f %5.0f\n"\
                 % (xcoords[pointsx[i]],ycoords[pointsy[i]],azmean,incmean,mean,std,fvert[0],fvert[1],fvert[2],fvert[3])
@@ -517,6 +530,58 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     print(extent)
     return dataset
 
+def read_dataset_tif(tiffile,plot=True,aoi=None):
+    """
+    Reads and plots the output from mintpy 
+    
+    Parameters:
+        tiffile (str): path to tif file
+        plot (boolean): if True plots the dataset
+        aoi (AOI_Selector): AOI_Selector to get the area of interest in the dataset
+    
+    Returns:
+        dataset (array): matrix that represents the dataset
+    """
+    with rasterio.open(tiffile) as src:
+        # Read the raster data
+        dataset = src.read()[0,:,:]
+        bounds = src.bounds
+
+    #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
+    
+    extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
+
+    if aoi is not None:
+        row1,col1=ll2rc(aoi.x1,aoi.y2,extent,dataset.shape)
+        row2,col2=ll2rc(aoi.x2,aoi.y1,extent,dataset.shape)
+        extent=[aoi.x1,aoi.x2,aoi.y1,aoi.y2]
+        dataset=dataset[row1:row2,col1:col2]
+    
+    vmin = np.nanpercentile(dataset, 1)
+    vmax = np.nanpercentile(dataset, 99)
+    
+    fig, ax = plt.subplots()
+    
+    if 'coh' in tiffile:
+        fig.suptitle('Coherence', fontsize=16)
+        cmap = matplotlib.cm.gist_gray.copy()
+        cmap.set_bad('black')
+        im=ax.imshow(dataset, cmap=cmap, extent=extent, vmin=vmin, vmax=vmax)
+    else:
+        fig.suptitle('Velocity', fontsize=16)
+        cmap=plt.cm.jet
+        im=ax.imshow(dataset,cmap=cmap,extent=extent,vmin=vmin, vmax=vmax)
+
+    if np.mean(np.abs(extent))<=180:
+        ax.set_ylabel('Latitude (°)')
+        ax.set_xlabel('Longitude (°)')
+    else:
+        ax.set_ylabel('North (m)')
+        ax.set_xlabel('East (m)')
+    plt.colorbar(im,orientation='horizontal')
+    print(extent)
+    return dataset
+
 def read_gnss_csv(csvfile,trans=False):
     """
     Reads csv file with a gnss dataset 
@@ -740,6 +805,114 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     #plt.axis('scaled')
     plt.show()
 
+
+def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+
+    import pygmt
+    import xarray as xr
+    
+    dataset,extent=los2npy(data,csvfile,maskfile=maskfile)
+    velocitycp=dataset
+    
+    quad=open(csvfile,'r')
+    lines=quad.readlines()
+    quad.close()
+    
+    region=list(extent)
+    
+    ref=[float(lines[0].split(':')[1].split(',')[i]) for i in range(2)] 
+    line=lines[0].split('Extent:')[1]
+    
+    coords=[float(line.split(',')[i]) for i in range(len(line.split(',')))]
+    for coord in coords:
+        if np.abs(coord)>180:
+            raise Exception('The dataset does not have lon/lat coordinates cannot use pygmt')
+    
+    lons=np.linspace(coords[0],coords[1],velocitycp.shape[1])
+    lats=np.linspace(coords[2],coords[3],velocitycp.shape[0])[::-1]
+    
+    quadobsa1=np.copy(velocitycp)*1e2
+    
+    box_x=[lons[0],lons[-1],lons[-1],lons[0],lons[0]]
+    box_y=[lats[-1],lats[-1],lats[0],lats[0],lats[-1]]
+    
+    print('region',region,[[lons[0],lons[-1],lats[-1],lats[0]]])
+    
+    data=xr.DataArray(data=quadobsa1,dims=['lat','lon'],coords={'lon':lons,'lat':lats})
+    
+    grid_data = '@earth_relief_03s' 
+    
+    grid=pygmt.datasets.load_earth_relief(resolution="03s", region=[lons[0],lons[-1],lats[-1],lats[0]])
+    orgrid=np.copy(grid)
+    dgrid = pygmt.grdgradient(grid=grid,azimuth=270)
+    grid.data[np.logical_and(grid.data>-1000,grid.data<0)]=np.nan
+    fig = pygmt.Figure()
+    pygmt.config(FORMAT_GEO_MAP='D')  # Use decimal degrees
+    pygmt.config(MAP_FRAME_TYPE='plain')  # Use decimal degrees
+    pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
+    pygmt.config(FONT_LABEL='30p,Helvetica,black')
+    pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    pygmt.config(COLOR_FOREGROUND='lightgray')
+    
+    pygmt.makecpt(cmap="gray", series=[-np.nanmax(grid.data), np.nanmax(grid.data)])
+
+    interlon=np.round(np.abs(np.max(lons)-np.min(lons))/5,1)
+    interlat=np.round(np.abs(np.max(lats)-np.min(lats))/5,1)
+    inter=np.max([interlon,interlat])
+
+    if title is not None:
+        frame=['a'+str(inter),'+t'+str(title)]
+    else:
+        frame=['a'+str(inter)]
+    
+    fig.grdimage(
+        grid=grid,
+        region=region,
+        projection='M8i',
+        frame=frame,
+        shading=True,
+    )
+
+    max=np.nanmax(np.abs(dataset)*1e2)*0.8
+    
+    pygmt.makecpt(cmap="jet", series=[-max, max])
+    
+    fig.grdimage(
+        grid=data,
+        region=region,
+        projection='M8i',
+        frame=frame,
+        #cmap='viridis',
+        transparency=30,
+        nan_transparent=True,
+    )
+    fig.colorbar(frame="af+lLOS deformation (cm)")
+    
+    pygmt.makecpt(cmap="jet", series=[-max, max])
+
+    lonll=np.percentile(lons,20)
+    latll=np.percentile(lats,20)
+    
+    fig.coast(shorelines="a/0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
+
+    if points is not None:
+        for i in range(len(points)):
+            fig.plot(x=points[i][0], y=points[i][1], style="a0.3", pen="3p,black")
+            if epoints is not None:
+                if not len(epoints)==len(points):
+                    raise Exception('The uncertainties and points do not have the same size')
+                fig.plot(x=[points[i][0]-epoints[i][0],points[i][0]+epoints[i][0]], y=[points[i][1],points[i][1]], pen="3p,gray30")
+                fig.plot(x=[points[i][0],points[i][0]], y=[points[i][1]-epoints[i][1],points[i][1]+epoints[i][1]], pen="3p,gray30")
+            if lpoints is not None:
+                if not len(lpoints)==len(points):
+                    raise Exception('The labels and points do not have the same size')
+                fig.text(x=points[i][0],y=points[i][1],text=lpoints[i],font="20p,Helvetica,black")
+            
+    
+    fig.savefig(output)
+    fig.show()
+
+
 def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
     """
     Creates matrix representing downsampled InSAR dataset replacing los deformation
@@ -795,7 +968,7 @@ class AOI_Selector:
     a mintpy output h5 file
     
     Attributes:
-        wl (float): wavelength of the mission
+        wl (float): wavelength of the mission in meters
         coh (array): coherence dataset in h5 file
         cohth (float): the pixels that have a coherence value below this won't be plot
         image (array): dataset to be plot
@@ -810,56 +983,75 @@ class AOI_Selector:
         current_ax (matplotlib subplot): subplot that has the plot for the dataset
     """
     def __init__(self,
-                 h5file,
-                 key,
+                 filename,
+                 key=None,
                  index=None,
                  wvl=None,
+                 los=True,
                  coh=None,cohth=0,ref_date=None,
                  fig_xsize=None, fig_ysize=None,
                  cmap=plt.cm.gist_gray,
                  vmin=None, vmax=None
                 ):
-        
-        h5f=h5py.File(h5file)
-        keys=[ke for ke in h5f.keys()]
-        if 'timeseries' in keys:
-            try:
-                dates=np.array([h5f['date'][:][i].decode('utf-8') for i in range(len(h5f['date'][:]))])
-                print('The possible dates are:',dates)
-                timeseries=h5f['timeseries'][:]
-                if key in dates:
-                    if ref_date:
-                        if ref_date in dates:
-                            velocity=timeseries[dates==key][0]-timeseries[dates==ref_date][0]
-                        else:
-                            print('The reference date was not found!!')
-                    else:
-                        velocity=timeseries[dates==key][0]
-                else:
-                    print('The date was not found in this dataset')
-                    velocity=timeseries[-1]
-            except:
-                raise Exception('The dataset does not exist in this file')
-        else:
-            if key in keys:
-                if index is None:
-                    velocity=h5f[key][:]
-                else:
-                    velocity=h5f[key][:][index,:,:]
-            else:
+
+        if '.h5' in filename:
+            h5file=filename
+            h5f=h5py.File(h5file)
+            keys=[ke for ke in h5f.keys()]
+            if key is None:
+                raise Exception('For h5 files you need to specify a key')
+            elif 'timeseries' in keys:
                 try:
-                    velocity=h5f['velocity'][:]
+                    dates=np.array([h5f['date'][:][i].decode('utf-8') for i in range(len(h5f['date'][:]))])
+                    print('The possible dates are:',dates)
+                    timeseries=h5f['timeseries'][:]
+                    if key in dates:
+                        if ref_date:
+                            if ref_date in dates:
+                                velocity=timeseries[dates==key][0]-timeseries[dates==ref_date][0]
+                            else:
+                                print('The reference date was not found!!')
+                        else:
+                            velocity=timeseries[dates==key][0]
+                    else:
+                        print('The date was not found in this dataset')
+                        velocity=timeseries[-1]
                 except:
-                    raise Exception('This dataset does not have LOS deformation')
-        if not wvl is None:
-            velocity=velocity*wvl/(-4*np.pi)
-        lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
-        lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
-        lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
-        #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
-        self.wl=float(h5f.attrs['WAVELENGTH'])
+                    raise Exception('The dataset does not exist in this file')
+            else:
+                if key in keys:
+                    if index is None:
+                        velocity=h5f[key][:]
+                    else:
+                        velocity=h5f[key][:][index,:,:]
+                else:
+                    try:
+                        velocity=h5f['velocity'][:]
+                    except:
+                        raise Exception('This dataset does not have LOS deformation')
+                        
+            lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
+            lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
+            lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
+            #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
+            #self.wl=float(h5f.attrs['WAVELENGTH'])
+            
+            h5f.close()
         
-        h5f.close()
+        elif '.tif' in filename:
+            with rasterio.open(filename) as src:
+                # Read the raster data
+                velocity = src.read()[0,:,:]
+                bounds = src.bounds
+                lonr1,lonr2,latr1,latr2=bounds.left,bounds.right,bounds.bottom,bounds.top
+        else:
+            raise Exception('Unknown format. VMOD can only read h5 or tif files.')
+
+        if not los:
+            if not wvl is None:
+                velocity=velocity*wvl/(-4*np.pi)
+            else:
+                raise Exception('You need to provide the wavelength of the SAR mission')
 
         velocity[velocity==0]=np.nan
         
@@ -890,13 +1082,8 @@ class AOI_Selector:
             self.fig, self.current_ax = plt.subplots()
         self.fig.suptitle('Area-Of-Interest Selector', fontsize=16)
         
-        if 'coherence' in key.lower():
-            self.cmap = matplotlib.cm.gist_gray.copy()
-            cmap.set_bad('black')
-            im=self.current_ax.imshow(self.image, cmap=self.cmap, extent=self.extent, vmin=self.vmin, vmax=self.vmax)
-        else:
-            self.cmap=plt.cm.jet
-            im=self.current_ax.imshow(self.image, cmap=plt.cm.jet, extent=self.extent, vmin=self.vmin, vmax=self.vmax)
+        self.cmap=plt.cm.jet
+        im=self.current_ax.imshow(self.image, cmap=plt.cm.jet, extent=self.extent, vmin=self.vmin, vmax=self.vmax)
 
         if np.mean(np.abs(self.extent))<=180:
             self.current_ax.set_ylabel('Latitude (°)')
@@ -955,7 +1142,7 @@ class Ref_Insar_Selector_Pre:
         velocity=aoi.image
         extent=aoi.extent
         lonr1,lonr2,latr1,latr2=extent
-        self.wl=aoi.wl
+        #self.wl=aoi.wl
 
         velocity[velocity==0]=np.nan
         if aoi.coh is not None:
