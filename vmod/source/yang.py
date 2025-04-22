@@ -99,7 +99,7 @@ class Yang(Source):
         d_critb = b * np.cos(np.deg2rad(theta))
         
         nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
-        if d_crita>=z0 or b>=z0 or a<=0 or b<=0:
+        if d_crita>=z0 or b>=z0 or a<=0 or b<=0 or a<b:
             return nans
         if theta==0:
             theta=0.1
