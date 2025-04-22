@@ -18,3 +18,4 @@ dependencies:
   - emcee
   - tqdm
   - ipympl
+  - pygmt
