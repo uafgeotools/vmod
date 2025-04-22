@@ -66,6 +66,8 @@ class Source:
         Returns:
             size (int): length of the parameters.
         """
+        if self.parameters is None:
+            self.get_parnames()
         return len(self.parameters)
 
     def set_x0(self, x0):
