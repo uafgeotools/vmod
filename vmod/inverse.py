@@ -6,6 +6,7 @@ import string
 import subprocess
 import sys
 import time
+from functools import partial
 from multiprocessing import Pool
 
 import numpy as np
@@ -49,8 +50,15 @@ class Inverse:
         """
         self.sources.append(source)
 
+    def onelsq(self, index=0):
+        try:
+            params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
+            return params,'d'
+        except ValueError:
+            return 'd','d'
+
     #interface to scipy bounded nonlinear least squares implementation
-    def nlsq(self, iter=64):
+    def nlsq(self, iter=64, parallel=False, processes=8):
         """
         Non-linear least squares approach using the trust reflective algorithm
         
@@ -60,12 +68,26 @@ class Inverse:
         self.minresidual=1e6
         if len(self.sources)==0:
             raise Exception('You need to include at least one source')
-
-        for i in tqdm(range(iter)):
-            try:
-                params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
-            except ValueError:
-                continue
+        if parallel:
+            pool = Pool(processes=processes)
+            subrutina=partial(self.onelsq)
+            paramst,nada=zip(*pool.map(subrutina, tqdm(range(iter))))
+            pool.close()
+            pool.join()
+            
+            for i in tqdm(range(iter)):
+                params=paramst[i]
+                if not params=='d':
+                    self.residual(params.x)
+        else:
+            for i in tqdm(range(iter)):
+                try:
+                    params = copy.deepcopy(least_squares(self.residual, self.get_x0(), bounds=self.get_bounds(), jac="3-point"))
+                except ValueError:
+                    continue
+                except KeyboardInterrupt:
+                    print('Inversion has been interrupted')
+                    break
 
         j=0
         for s in self.sources:
@@ -797,61 +819,3 @@ class Inverse:
         for s in self.sources:
             s.print_model(self.model.x[param_cnt:param_cnt+s.get_num_params()])
             param_cnt += s.get_num_params()
-
-    ##writes gmt files for horizontal and vertical deformation, each, to use with gmt velo.
-    def write_forward_gmt(self, prefix, volcano=None):
-        if self.model is not None:
-
-            ux,uy,uz = self.forward(self.model.x)
-
-            dat = np.zeros(self.obs.data['id'].to_numpy().size, 
-                dtype=[ ('lon', float), ('lat', float), ('east', float), ('north', float), 
-                        ('esig', float), ('nsig', float), ('corr', float), ('id', 'U6')] )
-
-            dat['lon']   = self.obs.data['lon'].to_numpy()
-            dat['lat']   = self.obs.data['lat'].to_numpy()
-            dat['east']  = ux*1000
-            dat['north'] = uy*1000
-            dat['esig']  = ux*0
-            dat['nsig']  = ux*0
-            dat['corr']  = ux*0
-            dat['id']    = self.obs.data['id'].to_numpy()
-
-            print(dat)
-
-            #horizontal predictions    
-            np.savetxt(prefix+"_hori.gmt", dat, fmt='%s' )
-
-            #vertical predictions    
-            dat['east']  = ux*0
-            dat['north'] = uz*1000
-            np.savetxt(prefix+"_vert.gmt", dat, fmt='%s' )
-            
-            if volcano is not None:
-                import utm
-                dat = np.zeros(len(self.sources), dtype=[ ('lon', float), ('lat', float), ('id', 'U6')] )
-
-                print(len(self.sources))                    
-
-                param_cnt = 0
-                source_cnt = 0
-
-                for s in self.sources:
-                    e_loc = volcano[0] + self.model.x[param_cnt]
-                    n_loc = volcano[1] + self.model.x[param_cnt+1]
-
-                    param_cnt += s.get_num_params()
-
-                    loc_ll = utm.to_latlon(e_loc, n_loc, volcano[2], volcano[3])
-
-                    dat["lat"][source_cnt] = loc_ll[0]
-                    dat["lon"][source_cnt] = loc_ll[1]
-                    dat["id"][source_cnt]  = s.get_source_id()
-
-                    source_cnt += 1
-
-                print(dat)                    
-
-                np.savetxt(prefix+"_source_loc.gmt", dat, fmt='%s' )
-        else:
-            print("No model, nothing to write")
