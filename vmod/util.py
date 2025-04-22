@@ -527,7 +527,7 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
         ax.set_ylabel('North (m)')
         ax.set_xlabel('East (m)')
     plt.colorbar(im,orientation='horizontal')
-    print(extent)
+    #print(extent)
     return dataset
 
 def read_dataset_tif(tiffile,plot=True,aoi=None):
@@ -582,7 +582,7 @@ def read_dataset_tif(tiffile,plot=True,aoi=None):
     print(extent)
     return dataset
 
-def read_gnss_csv(csvfile,trans=False):
+def read_gnss_csv(csvfile,trans=False,ignore=[]):
     """
     Reads csv file with a gnss dataset 
     
@@ -610,15 +610,16 @@ def read_gnss_csv(csvfile,trans=False):
     
     names,lons,lats,uxs,uys,uzs,euxs,euys,euzs=[],[],[],[],[],[],[],[],[]
     for line in lines:
-        names.append(line.split()[0])
-        lons.append(float(line.split()[1]))
-        lats.append(float(line.split()[2]))
-        uxs.append(float(line.split()[3]))
-        uys.append(float(line.split()[4]))
-        uzs.append(float(line.split()[5]))
-        euxs.append(float(line.split()[6]))
-        euys.append(float(line.split()[7]))
-        euzs.append(float(line.split()[8]))
+        if not line.split()[0] in ignore:
+            names.append(line.split()[0])
+            lons.append(float(line.split()[1]))
+            lats.append(float(line.split()[2]))
+            uxs.append(float(line.split()[3]))
+            uys.append(float(line.split()[4]))
+            uzs.append(float(line.split()[5]))
+            euxs.append(float(line.split()[6]))
+            euys.append(float(line.split()[7]))
+            euzs.append(float(line.split()[8]))
         
     lons=np.array(lons)
     lots=np.array(lats)
@@ -805,13 +806,207 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     #plt.axis('scaled')
     plt.show()
 
-
-def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
-
+def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, errx=None, erry=None, errz=None, arrowscale=0.01, ignore=[]):
+    """
+    Plots GNSS dataset with pygmt, horizontal velocities are represented by blue arrows
+    vertical velocities are represented by red arrows
+    
+    Parameters:
+        csvfile (str): filename for the csv that contains the GNSS velocities
+        uxs (array): deformation in the east component, if None it will plot data from the csv file
+        uys (array): deformation in the north component
+        uzs (array): deformation in the vertical component
+        scalebar (int): scalebar for the map in kilometers
+        output (str): filename for the output figure
+        title (str): title on the figure
+        points (array): coordinate points, if None no points will be plotted
+        epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
+        lpoints (array): labels for 'points', if None no labels will be plotted
+        errx (array): uncertainties in the deformation in the north component
+        erry (array): uncertainties in the deformation in the north component
+        errz (array): uncertainties in the deformation in the vertical component
+        arrowscale (float): scale for the velocities in meters per year, default 1cm/yr
+        ignore (array): names of the stations that will not be plotted
+    """
+    
     import pygmt
     import xarray as xr
+    import pandas as pd
     
-    dataset,extent=los2npy(data,csvfile,maskfile=maskfile)
+    names,lons,lats,uxsf,uysf,uzsf,euxs,euys,euzs=read_gnss_csv(csvfile,ignore=ignore)
+
+    if uxs is None:
+        uxs=uxsf
+        uys=uysf
+        uzs=uzsf
+    else:
+        if len(ignore)>0:
+            namest,lonst,latst,uxsft,uysft,uzsft,euxst,euyst,euzst=read_gnss_csv(csvfile)
+            namesf=list(set(namest)-set(names))
+            uxs=np.array([uxs[i] for i in range(len(uxs)) if namest[i] not in namesf])
+            uys=np.array([uys[i] for i in range(len(uys)) if namest[i] not in namesf])
+            uzs=np.array([uzs[i] for i in range(len(uzs)) if namest[i] not in namesf])
+            
+    if erry is None:
+        sxs=euxs
+        sys=euys
+        szs=euzs
+    else:
+        sxs=errx
+        sys=erry
+        szs=errz
+
+    interlon=np.round(np.abs(np.max(lons)-np.min(lons))*0.5,1)
+    interlat=np.round(np.abs(np.max(lats)-np.min(lats))*0.5,1)
+    inter=np.max([interlon,interlat])
+    region=[np.min(lons)-interlon,np.max(lons)+interlon,np.min(lats)-interlat,np.max(lats)+interlat]
+    
+    stns=[[lons[i],lats[i]] for i in range(len(lons))]
+    
+    lons=lons.tolist()+[region[0]+interlon/2]
+    lats=lats.tolist()+[region[-1]-interlat]
+    if arrowscale*1e2>=1:
+        names=names+[str(int(arrowscale*1e2))+"cm/yr"]
+    else:
+        names=names+[str(float(arrowscale*1e2))+"cm/yr"]
+    
+    uxs=np.array(uxs.tolist()+[arrowscale])
+    uys=np.array(uys.tolist()+[0.000])
+    uzs=np.array(uzs.tolist()+[arrowscale])
+    
+    sxs=np.array(sxs.tolist()+[0.000])
+    sys=np.array(sys.tolist()+[0.000])
+    szs=np.array(szs.tolist()+[0.000])
+    
+    df = pd.DataFrame(
+        data={
+            "x": lons,
+            "y": lats,
+            "east_velocity": uxs*1e3,
+            "north_velocity": uys*1e3,
+            "east_sigma": sxs*0,
+            "north_sigma": sys*0,
+        }
+    )
+    
+    df1 = pd.DataFrame(
+        data={
+            "x": lons,
+            "y": lats,
+            "east_velocity": uxs*0*3e6,
+            "north_velocity": uzs*1e3,
+            "east_sigma": sxs*0,
+            "north_sigma": szs*0,
+        }
+    )
+    
+    grid_data = '@earth_relief_03s' 
+    grid = pygmt.grdcut(grid_data,
+                                 region=region,
+                                )
+    
+    dgrid = pygmt.grdgradient(grid=grid,azimuth=270)
+    grid.data[np.logical_and(grid>177,grid<180)]=np.nan
+    fig = pygmt.Figure()
+    pygmt.config(FORMAT_GEO_MAP='D')  # Use decimal degrees
+    pygmt.config(MAP_FRAME_TYPE='plain')  # Use decimal degrees
+    pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
+    pygmt.config(FONT_LABEL='30p,Helvetica,black')
+    pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    pygmt.config(COLOR_FOREGROUND='lightgray')
+    pygmt.makecpt(cmap="gray", series=[-np.nanmax(grid.data), np.nanmax(grid.data)])
+
+    if title is not None:
+        frame=['a'+str(inter),'+t'+str(title)]
+    else:
+        frame=['a'+str(inter)]
+    
+    fig.grdimage(
+        grid=grid,
+        region=region,
+        projection='M8i',
+        frame=frame,
+        shading=True,
+    )
+
+    lonll=np.round(region[0]+interlon/2,1)
+    latll=np.round(region[2]+interlat/2,2)
+    
+    fig.coast(shorelines="0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
+    
+    fig.text(x=lons,y=np.array(lats)-float(inter/20),text=names,fill='white',font="30p,Helvetica,black")
+    
+    
+    fig.velo(
+        data=df,
+        region=region,
+        pen="5p,blue",
+        line="5p,blue",
+        projection='M8i',
+        spec="e"+str(0.25/(arrowscale*1e2))+"/0.39/10",
+        vector="0.7c+p0.5p+e+gblue",
+    )
+    
+    fig.velo(
+        data=df1,
+        region=region,
+        pen="5p,red",
+        line="5p,red",
+        projection='M8i',
+        spec="e"+str(0.25/(arrowscale*1e2))+"/0.39/10",
+        vector="0.7c+p0.5p+e+gred",
+    )
+
+    if points is not None:
+        for i in range(len(points)):
+            fig.plot(x=points[i][0], y=points[i][1], style="a0.3", pen="3p,black")
+            if epoints is not None:
+                if not len(epoints)==len(points):
+                    raise Exception('The uncertainties and points do not have the same size')
+                fig.plot(x=[points[i][0]-epoints[i][0],points[i][0]+epoints[i][0]], y=[points[i][1],points[i][1]], pen="3p,gray30")
+                fig.plot(x=[points[i][0],points[i][0]], y=[points[i][1]-epoints[i][1],points[i][1]+epoints[i][1]], pen="3p,gray30")
+            if lpoints is not None:
+                if not len(lpoints)==len(points):
+                    raise Exception('The labels and points do not have the same size')
+                fig.text(x=points[i][0],y=points[i][1]-float(inter/20),text=lpoints[i],font="20p,Helvetica,black")
+
+    
+    
+    fig.savefig(output)
+    fig.show()
+
+def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+    """
+    Plots InSAR dataset with pygmt
+    
+    Parameters:
+        csvfile (str): filename for the csv that contains the downsampled InSAR dataset
+        data (array): LOS deformation data, if None it will plot the data from the csv file
+        maskfile (array): filename for the mask file in npy format, if None no mask will be applied
+        scalebar (int): scalebar for the map in kilometers
+        output (str): filename for the output figure
+        title (str): title on the figure
+        points (array): coordinate points, if None no points will be plotted
+        epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
+        lpoints (array): labels for 'points', if None no labels will be plotted
+    """
+    import pygmt
+    import xarray as xr
+
+    if data is None:
+        archivo=open(quadfile,'r')
+        lines=archivo.readlines()
+        archivo.close()
+    
+        dim=[int(lines[0].split('Dimensions:')[1].split(',')[i]) for i in range(2)]
+        if maskfile:
+            mask_des=np.load(maskfile)
+        else:
+            mask_des=np.zeros((dim[0],dim[1]))
+            mask_des=mask_des>0
+        dataset,extent,rcoords=get_defmap(csvfile,mask=maskfile,trans=False,cref=False)
+    else:
+        dataset,extent=los2npy(data,csvfile,maskfile=maskfile)
     velocitycp=dataset
     
     quad=open(csvfile,'r')
@@ -835,8 +1030,6 @@ def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_py
     
     box_x=[lons[0],lons[-1],lons[-1],lons[0],lons[0]]
     box_y=[lats[-1],lats[-1],lats[0],lats[0],lats[-1]]
-    
-    print('region',region,[[lons[0],lons[-1],lats[-1],lats[0]]])
     
     data=xr.DataArray(data=quadobsa1,dims=['lat','lon'],coords={'lon':lons,'lat':lats})
     
@@ -882,7 +1075,6 @@ def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_py
         region=region,
         projection='M8i',
         frame=frame,
-        #cmap='viridis',
         transparency=30,
         nan_transparent=True,
     )
@@ -893,7 +1085,7 @@ def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_py
     lonll=np.percentile(lons,20)
     latll=np.percentile(lats,20)
     
-    fig.coast(shorelines="a/0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
+    fig.coast(shorelines="0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
 
     if points is not None:
         for i in range(len(points)):
@@ -906,7 +1098,7 @@ def plot_insar_pygmt(data, csvfile, maskfile=None, scalebar=5, output='figure_py
             if lpoints is not None:
                 if not len(lpoints)==len(points):
                     raise Exception('The labels and points do not have the same size')
-                fig.text(x=points[i][0],y=points[i][1],text=lpoints[i],font="20p,Helvetica,black")
+                fig.text(x=points[i][0],y=points[i][1]-float(inter/20),text=lpoints[i],font="20p,Helvetica,black")
             
     
     fig.savefig(output)
