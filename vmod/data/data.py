@@ -35,6 +35,7 @@ class Data:
         self.err=None
         self.refs=None
         self.utmz=None
+        self.ori=None
         #self.data_size_per_point=0
     
     def get_size_per_point(self):
@@ -73,11 +74,13 @@ class Data:
             self.utmz=[np.mean(xs),np.mean(ys),z1s,z2s]
             self.add_xs(xs-np.mean(xs))
             self.add_ys(ys-np.mean(ys))
+            ori=[np.mean(lons),np.mean(lats)]
         else:
             orix,oriy,z1sor,z2sor=util.ll2utm([ori[0]],[ori[1]],z1=z1s,z2=z2s)
             self.utmz=[orix[0],oriy[0],z1sor,z2sor]
             self.add_xs(xs-orix[0])
             self.add_ys(ys-oriy[0])
+        self.ori=ori
         self.lons=lons
         self.lats=lats
         
