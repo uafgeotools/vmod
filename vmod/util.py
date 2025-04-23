@@ -84,7 +84,7 @@ def ll2utm(lons,lats,z1=None,z2=None):
     ys=np.array(ys)
     return xs,ys,z1,z2
 
-def utm2ll(xs,ys,z1,z2):
+def utm2ll(xs,ys,z1,z2,northern=None):
     """
     Converts utm coordinates into lon/lat
     
@@ -100,7 +100,10 @@ def utm2ll(xs,ys,z1,z2):
     """
     lons,lats=[],[]
     for i in range(len(xs)):
-        lat,lon=utm.to_latlon(xs[i], ys[i], z1, z2)
+        if northern is not None and z2 is None:
+            lat,lon=utm.to_latlon(xs[i], ys[i], z1, northern=northern)
+        elif northern is None and z2 is not None:
+            lat,lon=utm.to_latlon(xs[i], ys[i], z1, z2)
         lons.append(lon)
         lats.append(lat)
     lons=np.array(lons)
@@ -497,6 +500,15 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
     
     extent=[lonr1,lonr2,latr1,latr2]
+    if np.mean(np.abs(extent))>180:
+        utm=h5f.attrs['UTM_ZONE']
+        z2=utm[-1]
+        northern=False
+        if z2=='N':
+            northern=True
+        z1=int(utm.replace(z2,''))
+        lons,lats=utm2ll(extent[0:2],extent[2::],z1,None,northern=northern)
+        extent=[np.min(lons),np.max(lons),np.min(lats),np.max(lats)]
     h5f.close()
     
     if aoi is not None:
@@ -507,8 +519,14 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     
     vmin = np.nanpercentile(dataset, 1)
     vmax = np.nanpercentile(dataset, 99)
+
+    ratio=(extent[1]-extent[0])/(extent[3]-extent[2])
     
     fig, ax = plt.subplots()
+
+    if ratio<0.3 or ratio>4:
+        print('bad ratio')
+        ax.set_aspect(1/ratio)
         
     fig.suptitle(key, fontsize=16)
     
@@ -526,6 +544,7 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     else:
         ax.set_ylabel('North (m)')
         ax.set_xlabel('East (m)')
+
     plt.colorbar(im,orientation='horizontal')
     #print(extent)
     return dataset
@@ -1225,6 +1244,16 @@ class AOI_Selector:
             lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
             lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
             lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
+            extent=[lonr1,lonr2,latr1,latr2]
+            if np.mean(np.abs(extent))>180:
+                utm=h5f.attrs['UTM_ZONE']
+                z2=utm[-1]
+                northern=False
+                if z2=='N':
+                    northern=True
+                z1=int(utm.replace(z2,''))
+                lons,lats=utm2ll(extent[0:2],extent[2::],z1,None,northern=northern)
+                lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
             #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
             #self.wl=float(h5f.attrs['WAVELENGTH'])
             
