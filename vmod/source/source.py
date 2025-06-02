@@ -204,6 +204,8 @@ class Source:
         
         return sxx,syy,sxy
         
+
+
     def stress(self, x, y, z, args):
         """
         Function that computes stresses in the horizontal plane.
@@ -221,53 +223,34 @@ class Source:
             sxz (list): shear stress in the xz direction (Pa).
             syz (list): shear stress in the yz direction (Pa).
         """
-        hx=0.001*np.abs(np.max(x)-np.min(x))
-        hy=0.001*np.abs(np.max(y)-np.min(y))
-        if hx==0:
-            h=hy
-        elif hy==0:
-            h=hx
-        elif hx<hy:
-            h=hx
-        elif hy<hx:
-            h=hy
-            
-        u,v,w=self.model_depth(x, y, z, *args)
+        from scipy.misc import derivative
+
+        ux=lambda h: self.model_depth(h, y, z, *args)[0]
+        vx=lambda h: self.model_depth(h, y, z, *args)[1]
+        wx=lambda h: self.model_depth(h, y, z, *args)[2]
+
+        uy=lambda h: self.model_depth(x, h, z, *args)[0]
+        vy=lambda h: self.model_depth(x, h, z, *args)[1]
+        wy=lambda h: self.model_depth(x, h, z, *args)[2]
+
+        uz=lambda h: self.model_depth(x, y, h, *args)[0]
+        vz=lambda h: self.model_depth(x, y, h, *args)[1]
+        wz=lambda h: self.model_depth(x, y, h, *args)[2]
+
+        dudx=derivative(ux,x,dx=1e-8)
+        dvdx=derivative(vx,x,dx=1e-8)
+        dwdx=derivative(wx,x,dx=1e-8)
+
+        dudy=derivative(uy,y,dx=1e-8)
+        dvdy=derivative(vy,y,dx=1e-8)
+        dwdy=derivative(wy,y,dx=1e-8)
+
+        dudz=-derivative(uz,z,dx=1e-8)
+        dvdz=-derivative(vz,z,dx=1e-8)
+        dwdz=-derivative(wz,z,dx=1e-8)
         
-        upx,vpx,wpx=self.model_depth(x+h, y, z, *args)
-        umx,vmx,wmx=self.model_depth(x-h, y, z, *args)
-        dudx=0.5*(upx-umx)/h
-        dvdx=0.5*(vpx-vmx)/h
-        dwdx=0.5*(wpx-wmx)/h
-        
-        upy,vpy,wpy=self.model_depth(x, y+h, z, *args)
-        umy,vmy,wmy=self.model_depth(x, y-h, z, *args)
-        dudy=0.5*(upy-umy)/h
-        dvdy=0.5*(vpy-vmy)/h
-        dwdy=0.5*(wpy-wmy)/h
-        
-        double=False
-        if isinstance(z,float):
-            if z==0:
-                double=True
-            else:
-                double==False
-        elif len(z[z==0])>0:
-            double=True
-            
-        if double:
-            upz,vpz,wpz=self.model_depth(x, y, z+2*h, *args)
-            umz,vmz,wmz=self.model_depth(x, y, z, *args)
-        else:
-            upz,vpz,wpz=self.model_depth(x, y, z+h, *args)
-            umz,vmz,wmz=self.model_depth(x, y, z-h, *args)
-        dudz=0.5*(upz-umz)/h
-        dvdz=0.5*(vpz-vmz)/h
-        dwdz=0.5*(wpz-wmz)/h
-        
-        
-        nu=args[-1]
-        mu=args[-2]
+        nu=args[-2]
+        mu=args[-1]
         
         sxx=2*(1+nu)*dudx*mu
         syy=2*(1+nu)*dvdy*mu
@@ -277,6 +260,130 @@ class Source:
         syz=(1+nu)*(dvdz+dwdy)*mu
         
         return sxx,syy,szz,sxy,sxz,syz
+
+    def fault_vectors(self,strike, dip, rake):
+        """
+        Function that calculates the normal and slip vectors for a fault geometry.
+        
+        Parameters:
+            strike: strike angle in degrees for the receiver fault
+            dip: dip angle in degrees for the receiver fault
+            rake: rake angle in degrees for the receiver fault
+        
+        Returns:
+            n: normal vector
+            s: slip vector
+        """
+        strike=np.radians(strike)
+        dip=np.radians(dip)
+        rake=np.radians(rake)
+        n = np.array([
+             np.sin(dip) * np.cos(strike),
+            -np.sin(dip) * np.sin(strike),
+             np.cos(dip)
+        ])
+    
+        s = np.array([
+            -np.cos(strike) * np.cos(dip) * np.sin(rake) + np.sin(strike) * np.cos(rake),
+             np.sin(strike) * np.cos(dip) * np.sin(rake) + np.cos(strike) * np.cos(rake),
+             np.sin(dip) * np.sin(rake)
+        ])
+    
+        return n / np.linalg.norm(n), s / np.linalg.norm(s)
+
+    def principal_stresses(self,z,args):
+        """
+        Function that calculates the value and orientation of principal stresses.
+        
+        Parameters:
+            z: slide to calculate for Coulomb stress change (depth is positive)
+            args: parameters for the model
+        
+        Returns:
+            s1s: value for the first principal stresses
+            s2s: value for the second principal stresses
+            s3s: value for the third principal stresses
+            d1s: orientation for the first principal stresses
+            d2s: orientation for the second principal stresses
+            d3s: orientation for the third principal stresses
+        """
+        xs=np.copy(self.data.xs)
+        ys=np.copy(self.data.ys)
+        sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
+        s1s=sxx*np.nan
+        s2s=sxx*np.nan
+        s3s=sxx*np.nan
+        d1s=np.ones((len(sxx),3))*np.nan
+        d2s=np.ones((len(sxx),3))*np.nan
+        d3s=np.ones((len(sxx),3))*np.nan
+        for i in range(len(sxx)):
+            st=np.ones((3,3))*np.nan
+            st[0,0]=sxx[i]
+            st[1,1]=syy[i]
+            st[2,2]=szz[i]
+            st[0,1]=sxy[i]
+            st[1,0]=sxy[i]
+            st[0,2]=sxz[i]
+            st[2,0]=sxz[i]
+            st[1,2]=syz[i]
+            st[2,1]=syz[i]
+            st[2,2]=szz[i]
+            eigenvalues, eigenvectors = np.linalg.eig(st)
+            s1s[i]=np.max(eigenvalues)
+            d1s[i,:]=eigenvectors[np.argmax(eigenvalues)]
+            s3s[i]=np.min(eigenvalues)
+            d3s[i,:]=eigenvectors[np.argmin(eigenvalues)]
+            for j,s in enumerate(eigenvalues):
+                if not s==s1s[i] and not s==s3s[i]:
+                    s2s[i]=s
+                    d2s[i,:]=eigenvectors[j]
+        return s1s,s2s,s3s,d1s,d2s,d3s
+        
+    
+    def coulomb_change(self,strike,dip,rake,z,friction,args):
+        """
+        Function that computes the Coulomb stress change on a receiver fault geometry.
+        
+        Parameters:
+            strike: strike angle in degrees for the receiver fault
+            dip: dip angle in degrees for the receiver fault
+            rake: rake angle in degrees for the receiver fault
+            z: slide to calculate for Coulomb stress change (depth is positive)
+            friction: friction coefficient
+            args: parameters for the model
+        
+        Returns:
+            sshear: shear stress in the receiver fault
+            snormal: normal stress in the receiver fault
+            coulomb: Coulomb stress change for the receiver fault
+        """
+        xs=np.copy(self.data.xs)
+        ys=np.copy(self.data.ys)
+        
+        if not 'model_depth' in dir(self) and (not dip==90 or not (rake==0 or rake==180) or not z==0):
+            raise Exception('The current model cannot compute internal displacements please define the function \'model_depth\' or change rake to 0 or 180, dip to 90 and z to 0')
+        elif not 'model_depth' in dir(self) and (dip==90 and (rake==0 or rake==180) and z==0):
+            print('Calculating only horizontal stresses on the free surface')
+            sxx,syy,sxy=self.strain(xs,ys,args)
+            sxx=(1+args[-2])*args[-1]*sxx
+            syy=(1+args[-2])*args[-1]*syy
+            sxy=(1+args[-2])*args[-1]*sxy
+            sxz,syz,szz=sxx*0,sxx*0,sxx*0            
+        else:
+            sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
+        
+        n,s=self.fault_vectors(strike,dip,rake)
+        nx,ny,nz=n
+        sx,sy,sz=s
+        
+        tx=sxx*nx+sxy*ny+sxz*nz
+        ty=sxy*nx+syy*ny+syz*nz
+        tz=sxz*nx+syz*ny+szz*nz
+        
+        snormal=tx*nx+ty*ny+tz*nz
+        sshear=(tx*sx+ty*sy+tz*sz)
+        
+        return sshear,snormal,sshear+friction*snormal
     
     def forward(self,args,unravel=True):
         """
@@ -315,7 +422,6 @@ class Source:
             if self.data.__class__.__name__=='Tilt' and 'model_tilt_t' in dir(self):
                 func_tilt_time=lambda x,y,t: self.model_tilt_t(x,y,t,*args)
                 func_tilt_time.__name__ = 'func_tilt_time'
-                print('Name',func_tilt_time.__name__)
                 return self.data.from_model(func_tilt_time,offsets,unravel)
             elif 'model_t' in dir(self):
                 func_time=lambda x,y,t: self.model_t(x,y,t,*args)

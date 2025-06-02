@@ -141,6 +141,58 @@ class Mogi(Source):
         #print(dx)
         
         return dx, dy
+
+    def model_depth(self, x, y, z, xcen, ycen, d, dV, nu=0.25, mu=1):
+        """
+        Internal displacements for a point source (Mindlin, 1936)
+
+        Parameters:
+            x: x-coordinate for displacement (m)
+            y: y-coordinate for displacement (m)
+            z: z-coordinate for displacement (m)
+            xcen: y-offset of point source epicenter (m)
+            ycen: y-offset of point source epicenter (m)
+            d: depth to point (m)
+            rad: chamber radius (m)
+            dV: change in volume (m^3)
+            dP: change in pressure (Pa)
+            nu: poisson's ratio for medium
+            mu: shear modulus for medium (Pa)
+            order: highest order term to include (up to 2)
+            output: 'cart' (cartesian), 'cyl' (cylindrical)
+
+        Returns:
+            dx (array) : inclination in the x-axis in radians.
+            dy (array) : inclination in the y-axis in radians.
+        """
+        nans=np.array([x*0+1e6,x*0+1e6,x*0+1e6])
+        xc = x - xcen
+        yc = y - ycen
+
+        z=-z
+
+        lamb=2*mu*nu/(1-2*nu)
+        alpha=(lamb+mu)/(lamb+2*mu)
+        dp=d-z
+        dn=d+z
+
+        # Convert to surface cylindrical coordinates
+        #th, rho = util.cart2pol(x,y) # surface angle and radial distance
+        R = lambda dt: np.sqrt(dt**2+xc**2+yc**2)     # radial distance from source
+
+        uah= lambda h,dt:-((1-alpha)/2)*(h/R(dt)**3)
+        ubh= lambda h,dt: ((1-alpha)/alpha)*(h/R(dt)**3)
+        uch= lambda h,dt: (1-alpha)*(3*h*dt)/(R(dt)**5)
+
+        ucz= lambda dt: (1-alpha)*(1-3*(dt/R(dt))**2)/R(dt)**3
+
+        C=(dV/(2*np.pi))
+
+        ux=C*(uah(xc,dp)-uah(xc,dn)+ubh(xc,dp)+z*uch(xc,dp))
+        uy=C*(uah(yc,dp)-uah(yc,dn)+ubh(yc,dp)+z*uch(yc,dp))
+        uz=C*(uah(dp,dp)-uah(dn,dn)+ubh(dp,dp)+z*ucz(dp))
+        
+        return ux, uy, uz
     
     def calc_genmax(self,t,xcen=0,ycen=0,d=4e3,dP=100e6,a=700,nu=0.25,G=30e9,
                     mu1=0.5,eta=2e16,**kwargs):
