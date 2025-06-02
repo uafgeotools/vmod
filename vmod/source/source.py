@@ -309,7 +309,17 @@ class Source:
         """
         xs=np.copy(self.data.xs)
         ys=np.copy(self.data.ys)
-        sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
+        if not 'model_depth' in dir(self) and not z==0:
+            raise Exception('The current model cannot compute internal displacements please define the function \'model_depth\' or change rake to 0 or 180, dip to 90 and z to 0')
+        elif not 'model_depth' in z==0:
+            print('Calculating only two principal stresses on the free surface')
+            sxx,syy,sxy=self.strain(xs,ys,args)
+            sxx=(1+args[-2])*args[-1]*sxx
+            syy=(1+args[-2])*args[-1]*syy
+            sxy=(1+args[-2])*args[-1]*sxy
+            sxz,syz,szz=sxx*0,sxx*0,sxx*0            
+        else:
+            sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
         s1s=sxx*np.nan
         s2s=sxx*np.nan
         s3s=sxx*np.nan
