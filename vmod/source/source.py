@@ -291,6 +291,42 @@ class Source:
     
         return n / np.linalg.norm(n), s / np.linalg.norm(s)
 
+    def principal_stresses_2d(self,args):
+        """
+        Function that calculates the value and orientation for the first two principal stresses.
+        
+        Parameters:
+            args: parameters for the model
+        
+        Returns:
+            s1s: value for the first principal stresses
+            s2s: value for the second principal stresses
+            d1s: orientation for the first principal stresses
+            d2s: orientation for the second principal stresses
+        """
+        xs=np.copy(self.data.xs)
+        ys=np.copy(self.data.ys)
+        sxx,syy,sxy=self.strain(xs,ys,args)
+        sxx=(1+args[-2])*args[-1]*sxx
+        syy=(1+args[-2])*args[-1]*syy
+        sxy=(1+args[-2])*args[-1]*sxy
+        s1s=sxx*np.nan
+        s2s=sxx*np.nan
+        d1s=np.ones((len(sxx),2))*np.nan
+        d2s=np.ones((len(sxx),2))*np.nan
+        for i in range(len(sxx)):
+            st=np.ones((2,2))*np.nan
+            st[0,0]=sxx[i]
+            st[1,1]=syy[i]
+            st[0,1]=sxy[i]
+            st[1,0]=sxy[i]
+            eigenvalues, eigenvectors = np.linalg.eig(st)
+            s1s[i]=np.max(eigenvalues)
+            d1s[i,:]=eigenvectors[np.argmax(eigenvalues)]
+            s2s[i]=np.min(eigenvalues)
+            d2s[i,:]=eigenvectors[np.argmin(eigenvalues)]
+        return s1s,s2s,d1s,d2s
+
     def principal_stresses(self,z,args):
         """
         Function that calculates the value and orientation of principal stresses.
@@ -307,19 +343,11 @@ class Source:
             d2s: orientation for the second principal stresses
             d3s: orientation for the third principal stresses
         """
+        if not 'model_depth' in dir(self):
+            raise Exception('The current model cannot compute internal displacements please define the function \'model_depth\' or use function \'principal_stresses_2d\'')
         xs=np.copy(self.data.xs)
         ys=np.copy(self.data.ys)
-        if not 'model_depth' in dir(self) and not z==0:
-            raise Exception('The current model cannot compute internal displacements please define the function \'model_depth\' or change rake to 0 or 180, dip to 90 and z to 0')
-        elif not 'model_depth' in z==0:
-            print('Calculating only two principal stresses on the free surface')
-            sxx,syy,sxy=self.strain(xs,ys,args)
-            sxx=(1+args[-2])*args[-1]*sxx
-            syy=(1+args[-2])*args[-1]*syy
-            sxy=(1+args[-2])*args[-1]*sxy
-            sxz,syz,szz=sxx*0,sxx*0,sxx*0            
-        else:
-            sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
+        sxx,syy,szz,sxy,sxz,syz=self.stress(xs,ys,z,args)
         s1s=sxx*np.nan
         s2s=sxx*np.nan
         s3s=sxx*np.nan
