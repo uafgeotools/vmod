@@ -493,8 +493,10 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     else:
         dataset=h5f[key][:][index,:,:]
     
-    lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
-    lats=[float(h5f.attrs['LAT_REF1']), float(h5f.attrs['LAT_REF2']),float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
+    #lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
+    lons=[float(h5f.attrs['X_FIRST']),float(h5f.attrs['X_FIRST'])+dataset.shape[1]*float(h5f.attrs['X_STEP'])]
+    #lats=[float(h5f.attrs['LAT_REF1']), float(h5f.attrs['LAT_REF2']),float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
+    lats=[float(h5f.attrs['Y_FIRST'])+dataset.shape[0]*float(h5f.attrs['Y_STEP']),float(h5f.attrs['Y_FIRST'])]
     
     lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
     #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
@@ -1241,8 +1243,10 @@ class AOI_Selector:
                     except:
                         raise Exception('This dataset does not have LOS deformation')
                         
-            lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
-            lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
+            #lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
+            lons=[float(h5f.attrs['X_FIRST']),float(h5f.attrs['X_FIRST'])+velocity.shape[1]*float(h5f.attrs['X_STEP'])]
+            #lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
+            lats=[float(h5f.attrs['Y_FIRST'])+velocity.shape[0]*float(h5f.attrs['Y_STEP']),float(h5f.attrs['Y_FIRST'])]
             lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
             extent=[lonr1,lonr2,latr1,latr2]
             if np.mean(np.abs(extent))>180:
