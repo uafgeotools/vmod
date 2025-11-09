@@ -57,7 +57,7 @@ In this repository we included several notebooks to show the steps necessary to 
 
 ## Stress calculations:
 
-VMOD allows to calculate Coulomb stress changes for forward models in the notebook [Coulomb stress changes](CFS.ipynb)
+VMOD allows to calculate Coulomb stress changes for forward models in the notebook [Coulomb stress changes](CFS.ipynb) and the magnitude and orientation of [principal stresses](Principal_Stresses.ipynb)
 
 ## Add new datatype:
 
