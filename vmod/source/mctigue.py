@@ -3,6 +3,8 @@ from .. import util
 import scipy
 from scipy.integrate import quad,quad_vec
 from . import Source
+from hankel import HankelTransform
+
 
 class Mctigue(Source):
     """
@@ -204,8 +206,6 @@ class Mctigue(Source):
         else:
             if len(d[rad>d])>0:
                 return x*np.Inf,x*np.Inf,x*np.Inf
-        
-        #dP = dV*mu/(np.pi*rad**3)
 
         # dimensionless scaling term
         scale = dP * d / mu
@@ -215,15 +215,13 @@ class Mctigue(Source):
         th, r = util.cart2pol(x,y)
         rho = r / d #dimensionless radial distance
         zeta = z / d
-        
+
         uz0=(eps**3)*0.25*(1-zeta)/(rho**2+(1-zeta)**2)**(1.5)
         ur0=(eps**3)*0.25*rho/(rho**2+(1-zeta)**2)**(1.5)
-        
-        #Auz1=self.auz1(nu,rho,zeta)
+
         Auz1=self.uadd(nu,rho,zeta,typ=0,coord='z')
-        #Aur1=self.aur1(nu,rho,zeta)
         Aur1=self.uadd(nu,rho,zeta,typ=0,coord='r')
-        
+
         R=np.sqrt(rho**2+(1-zeta)**2)
         sint=rho/R
         cost=(1-zeta)/R
@@ -233,42 +231,44 @@ class Mctigue(Source):
         P2=0.5*(3*cost**2-1)
         dP0=0
         dP2=3*cost*sint
-        #dP2=3*cost
         ur38=-0.5*P0*D3[0]/R**2+(C3[1]*(5-4*nu)-1.5*D3[1]/R**2)*P2/R**2
         ut39=-(2*C3[0]*(1-nu)-0.5*D3[0]/R**2)*dP0-(C3[1]*(1-2*nu)+0.5*D3[1]/R**2)*dP2/R**2
-        
+
         ut39=ut39*sint
         Auz3=ur38*cost-ut39*sint
         Aur3=ur38*sint+ut39*cost
-        
-        #Auz6=self.auz6(nu,rho,zeta)
+
         Auz6=self.uadd(nu,rho,zeta,typ=1,coord='z')
-        #Aur6=self.aur6(nu,rho,zeta)
         Aur6=self.uadd(nu,rho,zeta,typ=1,coord='r')
-        #print(Auz1,Auz6,Aur1,Aur6)
         uz=uz0+(eps**3)*(Auz1+Auz3)+(eps**6)*Auz6
-        #uz=uz0+(eps**3)*(Auz1+Auz3)
         ur=ur0+(eps**3)*(Aur1+Aur3)+(eps**6)*Aur6
-        #ur=ur0+(eps**3)*(Aur1+Aur3)
-       
+
         ux=ur*x/r
         uy=ur*y/r
-        
+
         ux=ux*dP*d/mu
         uy=uy*dP*d/mu
         uz=uz*dP*d/mu
-        
+
         return ux, uy, uz
 
     def uadd(self,nu,r,zeta,typ=0,coord='r'):
-        from hankel import HankelTransform
-        import hankel
-        
-        #sigma=lambda tt: (1-typ)*0.5*np.exp(-tt)+typ*(1.5*(1+tt)*np.exp(-tt)/(7-5*nu))#Doesn't include extra tt because Hankel transform ends with tt*dtt
+        """
+        Auxiliary functions to calculate displacements (for detail check McTigue, 1987)
+
+        Parameters:
+            nu: poisson's ratio for medium (default 0.25)
+            r: radial coordinate in a cylindrical coordinate system
+            zeta: depth slice in terms of the source depth (z/d) Xi variable in the original paper
+            type: order of the hankel transform
+            coord: define if it is a radial ('r') or vertical ('z') coordinate
+
+        Returns:
+            Au (array) : displacements from the image source.
+        """
         sigma1=lambda tt: 0.5*np.exp(-tt)
         sigma2=lambda tt: 1.5*(1+tt)*np.exp(-tt)/(7-5*nu)
         tau2= lambda tt: tt*np.exp(-tt)/(7-5*nu)
-        #tau=lambda tt: (1-typ)*0.5*np.exp(-tt)+typ*tt*np.exp(-tt)/(7-5*nu)#Doesn't include extra tt because Hankel transform ends with tt*dtt
         f1=lambda tt,ex: 0.5*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)
         f2=lambda tt,ex: 0.5*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)
 
@@ -280,13 +280,10 @@ class Mctigue(Source):
                 a8= lambda tt: sigma2(tt)*f2(tt,0)
                 a18= lambda tt: tau2(tt)*f1(tt,0)
             dur= lambda tt: a8(tt)+a18(tt)
-            #dur= lambda tt: (a8(tt)+a18(tt))*scipy.special.jv(1, tt*r)*tt
-            #h=hankel.get_h(dur,nu=1)
             ht = HankelTransform(nu=1, N=1000, h=0.001)    
             result = ht.transform(dur, r)
-            
+
             return result[0]
-            #return quad_vec(dur,0,50)[0]
         else:
             if typ==0:
                 a7= lambda tt: 0.5*0.5*(2*(1-nu)+tt*zeta)*np.exp(tt*(-zeta-1))
@@ -295,108 +292,8 @@ class Mctigue(Source):
                 a7= lambda tt: 0.5*(2*(1-nu)+tt*zeta)*tt*np.exp(tt*(-zeta-1))/(7-5*nu)#(1.5*(1+tt))
                 a17= lambda tt: 0.5*((1-2*nu)+tt*zeta)*tt*np.exp(tt*(-zeta-1))/(7-5*nu)
             duz= lambda tt: a7(tt)+a17(tt)
-            #h=hankel.get_h(duz,nu=0) 
             R=np.sqrt(r**2+zeta**2)
-            #R=r
-            #duz= lambda tt: (a7(tt)+a17(tt))*scipy.special.jv(0, tt*R)*tt
-            
-            #return quad_vec(duz,0,50)[0]
-
-            ht = HankelTransform(nu=0, N=1000, h=0.001)    
-            
+            ht = HankelTransform(nu=0, N=1000, h=0.001)
             result = ht.transform(duz, R)
 
             return result[0]
-    def uadd1(self,nu,r,zeta,typ=0,coord='r'):
-        from hankel import HankelTransform
-        ht0 = HankelTransform(nu=0, N=1000, h=0.001)
-        ht1 = HankelTransform(nu=1, N=1000, h=0.001)
-        if typ==0 and coord=='z':
-            R=np.sqrt(r**2+zeta**2)
-            #R=r
-            a7=lambda tt: 0.5*0.5*np.exp(-tt)*(2*(1-nu)-tt*zeta)*np.exp(tt*zeta)
-            a17=lambda tt: 0.5*0.5*np.exp(-tt)*((1-2*nu)-tt*zeta)*np.exp(tt*zeta)
-            duz=lambda tt: a7(tt)+a17(tt)
-            return ht0.transform(duz, R)[0]
-            #duz=lambda tt: (a7(tt)+a17(tt))*tt*scipy.special.jv(0, tt*R)
-            #return quad_vec(duz,0,50)[0]
-        elif typ==1 and coord=='z':
-            R=np.sqrt(r**2+zeta**2)
-            #R=r
-            a7=lambda tt: 0.5*(tt*np.exp(-tt)/(7-5*nu))*(2*(1-nu)-tt*zeta)*np.exp(tt*zeta)
-            a17=lambda tt: 0.5*(tt*np.exp(-tt)/(7-5*nu))*((1-2*nu)-tt*zeta)*np.exp(tt*zeta)
-            duz=lambda tt: a7(tt)+a17(tt)
-            return ht0.transform(duz, R)[0]
-            #duz=lambda tt: (a7(tt)+a17(tt))*tt*scipy.special.jv(0, tt*R)
-            #return quad_vec(duz,0,50)[0]
-        elif typ==0 and coord=='r':
-            aur=r*np.nan
-            R=r
-            #R=np.sqrt(r**2+zeta**2)
-            a18=lambda tt: 0.5*0.5*np.exp(-tt)*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)
-            a8=lambda tt: 0.5*0.5*np.exp(-tt)*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)
-            dur=lambda tt: a8(tt)+a18(tt)
-            return ht1.transform(dur, R)[0]
-            #dur=lambda tt: (a8(tt)+a18(tt))*tt*scipy.special.jv(1, tt*R)
-            #return quad_vec(dur,0,50)[0]
-        elif typ==1 and coord=='r':
-            R=r
-            #R=np.sqrt(r**2+zeta**2)
-            a18=lambda tt: 0.5*(tt*np.exp(-tt)/(7-5*nu))*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)
-            a8=lambda tt: 0.5*(1.5*(1+tt)*np.exp(-tt)/(7-5*nu))*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)
-            dur=lambda tt: a8(tt)+a18(tt)
-            return ht1.transform(dur, R)[0]
-            #dur=lambda tt: (a8(tt)+a18(tt))*tt*scipy.special.jv(1, tt*R)
-            #return quad_vec(dur,0,50)[0]
-    
-    def auz1(self,nu,r,zeta):
-        """
-        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
-        """
-        R=np.sqrt(r**2+zeta**2)
-        #R=r
-        sigma=lambda tt: 0.5*tt*np.exp(-tt)
-        a7=lambda tt: 0.5*sigma(tt)*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(0, tt*R)
-        a17=lambda tt: 0.5*sigma(tt)*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(0, tt*R)
-        duz=lambda tt: a7(tt)+a17(tt)
-        return quad_vec(duz,0,50)[0]
-    
-    def auz6(self,nu,r,zeta):
-        """
-        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
-        """
-        R=np.sqrt(r**2+zeta**2)
-        #R=r
-        sigma=lambda tt: (tt**2)*np.exp(-tt)/(7-5*nu)
-        tau=lambda tt: tt**2*np.exp(-tt)/(7-5*nu)
-        a7=lambda tt: 0.5*sigma(tt)*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(0, tt*R)
-        a17=lambda tt: 0.5*tau(tt)*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(0, tt*R)
-        duz=lambda tt: a7(tt)+a17(tt)
-        return quad_vec(duz,0,50)[0]
-    
-    def aur1(self,nu,r,zeta):
-        """
-        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
-        """
-        aur=r*np.nan
-        R=r
-        #R=np.sqrt(r**2+zeta**2)
-        sigma=lambda tt: 0.5*tt*np.exp(-tt)
-        a18=lambda tt: 0.5*sigma(tt)*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(1, tt*R)
-        a8=lambda tt: 0.5*sigma(tt)*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(1, tt*R)
-        dur=lambda tt: a8(tt)+a18(tt)
-        return quad_vec(dur,0,50)[0]
-    
-    def aur6(self,nu,r,zeta):
-        """
-        Auxiliary function to calculate displacements (for detail check McTigue, 1987)
-        """
-        aur=r*np.nan
-        R=r
-        #R=np.sqrt(r**2+zeta**2)
-        sigma=lambda tt: 1.5*(tt+tt**2)*np.exp(-tt)/(7-5*nu)
-        tau=lambda tt: tt**2*np.exp(-tt)/(7-5*nu)
-        a18=lambda tt: 0.5*tau(tt)*(2*(1-nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(1, tt*R)
-        a8=lambda tt: 0.5*sigma(tt)*((1-2*nu)-tt*zeta)*np.exp(-tt*zeta)*scipy.special.jv(1, tt*R)
-        dur=lambda tt: a8(tt)+a18(tt)
-        return quad_vec(dur,0,50)[0]

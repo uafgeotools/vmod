@@ -1,6 +1,8 @@
 import numpy as np
 from . import Data
 import scipy
+from vmod.util import derivative
+
 
 class Tilt(Data):
     """
@@ -137,15 +139,14 @@ class Tilt(Data):
         Returns:
             model (array): array containing the components
         """
-        #print(func.__name__)
         if 'tilt' in func.__name__:
             dx,dy=func(self.xs,self.ys)
         else:
             uzx= lambda xpos: func(xpos,self.ys)[2]
             uzy= lambda ypos: func(self.xs,ypos)[2]
 
-            dx=-scipy.misc.derivative(uzx,self.xs,dx=self.delta)
-            dy=-scipy.misc.derivative(uzy,self.ys,dx=self.delta)
+            dx=-derivative(uzx,self.xs,delta=self.delta)
+            dy=-derivative(uzy,self.ys,delta=self.delta)
         
         model=()
         if isinstance(self.dx,(list,np.ndarray)):

@@ -23,6 +23,24 @@ from scipy import stats
 from scipy.interpolate import interp1d
 from skimage.restoration import denoise_nl_means, estimate_sigma
 
+
+def derivative(f, x, delta):
+    """
+    Calculates the derivative for a function f at the point x using finite difference with the factor delta
+
+    Parameters:
+        f (callable): function with one input variable
+        x (float or array): points where the derivative will be calculated
+        delta: factor to be used for the finite differences
+
+    Returns:
+        dfdx (float or array): result of the derivative at x
+    """
+    fpx=f(x+delta)
+    fnx=f(x-delta)
+
+    return (fpx-fnx)/(2*delta)
+
 def cart2pol(x1,x2):
     """
     Converts cartesian coordinates to polar coordinates
@@ -55,7 +73,7 @@ def pol2cart(theta,r):
     x1 = r * np.cos(theta)
     x2 = r * np.sin(theta)
     return x1,x2
-    
+
 def ll2utm(lons,lats,z1=None,z2=None):
     """
     Projects lon/lat coordinates using certain utm zone
@@ -124,7 +142,7 @@ def get_quadtree(ref,az,lk,name='quadtree.txt',th=None):
     im=ref.dataset
     if th is None:
         th=np.nanvar(im)/50
-    
+
     quadtree_var(im,az,lk,ref.extent,th,name)
 
 def rewrite_csv(los,ref,old,name='output.txt'):
@@ -149,14 +167,14 @@ def rewrite_csv(los,ref,old,name='output.txt'):
         linef=lines[i].split()
         line="%6.3f %6.3f %1.6f %1.6f %1.6f %1.9f %5.0f %5.0f %5.0f %5.0f\n"\
                 % (float(linef[0]),float(linef[1]),float(linef[2]),float(linef[3]),los[i-1],float(linef[5]),float(linef[6]),float(linef[7]),float(linef[8]),float(linef[9]))
-        
+
         result.write(line)
     result.close()
 
 def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
     """
     Downsample an image (im) acoording to a variance threshold (th)
-    
+
     Parameters:
         im (array): image (represented by a matrix) to be downsampled
         az (array or float): interferogram azimuth angle clockwise from north (degrees)
@@ -180,21 +198,18 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
         pass
     else:
         raise Exception('Azimuth or Incidence not in the right format')
-    
+
     if denoise:
         imfil=denoise_nl_means(imcp, h=0.6 * 0.5, sigma=0.5, fast_mode=True, **patch_kw)
     else:
         imfil=np.copy(imcp)
 
     imfil[imcp==0]=np.nan
-    
-    
-    
+
     fverts=[]
     pointsx=[]
     pointsy=[]
-    
-    
+
     def quadtree_im(im,inverts,th):
         """
         Recurrent split function, if the image has a variance lower than th
@@ -227,9 +242,9 @@ def quadtree_var(im,az,inc,extent,th,name='quadtree.txt',ref=None,denoise=True):
             quadtree_im(im[halfr::,0:halfc],[inverts[0]+halfr,inverts[1]],th)
             quadtree_im(im[0:halfr,halfc::],[inverts[0],inverts[1]+halfc],th)
             quadtree_im(im[halfr::,halfc::],[inverts[0]+halfr,inverts[1]+halfc],th)
-            
+ 
     quadtree_im(imfil,[0,0],th)
-    
+
     print('Final samples: ',len(fverts))
     ar=open(name,'w')
     if ref is None:
@@ -268,7 +283,7 @@ def calc_std(mat,verts):
     
     if not std==0:
         return std
-    
+
     if verts[0]==0 and not verts[2]==0:
         newverts=[verts[0],verts[1]+2,verts[2]-1,verts[3]+1]
     elif verts[0]==0 and verts[2]==0:
@@ -283,7 +298,7 @@ def calc_std(mat,verts):
         newverts=[verts[0]-1,verts[1]+1,verts[2]-2,verts[3]]
     else:
         newverts=[verts[0]-1,verts[1]+1,verts[2]-1,verts[3]+1]
-        
+
     return calc_std(mat,newverts)
     
 def points2map(xs,ys,data):
@@ -343,7 +358,7 @@ def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
     dim=(int(linesor[0].split(':')[2].split(',')[0]),int(linesor[0].split(':')[2].split(',')[1]))
     ext=(float(linesor[0].split(':')[3].split(',')[0]), float(linesor[0].split(':')[3].split(',')[1]), float(linesor[0].split(':')[3].split(',')[2]), float(linesor[0].split(':')[3].split(',')[3]))
     rcoords=None
-    
+
     if not 'None' in linesor[0]:
         rcoords=[float(linesor[0].split(':')[1].split(',')[0]),float(linesor[0].split(':')[1].split(',')[1])]
         intc=(ext[1]-ext[0])/dim[1]
@@ -352,10 +367,10 @@ def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
         row=int((ext[3]-rcoords[1])/intr)
     
     lines=[line for line in linesor if not line[0]=='%']
-    
+
     quad=np.zeros(dim)
     quad[:,:]=np.nan
-    
+
     xs,ys,qlos=[],[],[]
     for i,line in enumerate(lines):
         xs.append(float(line.split()[0]))
@@ -366,28 +381,28 @@ def get_defmap(quadfile='quadtree.txt',mask=None, trans=False,cref=True):
         if rcoords is not None:
             if vert[0]<=row<=vert[1] and vert[2]<=col<=vert[3]:
                 posmin=i
-        
+
     xs=np.array(xs)
     ys=np.array(ys)
     uxs=np.array(list(set(xs)))
     uys=np.array(list(set(ys)))
     qlos=np.array(qlos)
-    
+
     if 'None' in linesor[0]:
         posmin=np.argmin(np.abs(qlos))
         rcoords=[xs[posmin],ys[posmin]]
-    
+
     if cref:
         quad[:,:]-=qlos[posmin]
     if mask is not None:
         quad[mask]=np.nan
-    
+
     if trans:
         utmxs,utmys,z1s,z2s=ll2utm([ext[0],ext[1]],[ext[2],ext[3]])
         refxs,refys,z1s,z2s=ll2utm([rcoords[0]],[rcoords[1]])
         ext=[utmxs[0],utmxs[1],utmys[0],utmys[1]]
         rcoords=[refxs[0],refys[0]]
-        
+
     return quad,ext,rcoords
 
 def min_distance(points):
@@ -407,16 +422,16 @@ def min_distance(points):
                 if np.abs(points[i]-points[j])<mini:
                     mini=np.abs(points[i]-points[j])
         return mini
-    
+
     spoints=np.array(sorted(np.copy(points).tolist()))
     mid=len(points)//2
     midpoint=spoints[mid]
     left=spoints[:mid]
     right=spoints[mid::]
-    
+
     minleft=min_distance(left)
     minright=min_distance(right)
-    
+
     if minleft<minright:
         return minleft
     else:
@@ -443,7 +458,7 @@ def ll2rc(lon,lat,extent,dims):
     row=np.argmin(np.abs(lats-lat))
 
     col=np.argmin(np.abs(lons-lon))
-    
+
     return row,col
 
 def get_closest_point(row,col,dataset):
@@ -465,19 +480,19 @@ def get_closest_point(row,col,dataset):
         x=np.linspace(0,dataset.shape[1],dataset.shape[1])
         y=np.linspace(0,dataset.shape[0],dataset.shape[0])
         XX,YY=np.meshgrid(x,y)
-        
+
         XX[np.isnan(dataset)]=np.nan
         YY[np.isnan(dataset)]=np.nan
-        
+
         dif=np.sqrt((XX-col)**2+(YY-row)**2)
-        
+
         row,col=np.unravel_index(np.nanargmin(dif), dif.shape)
         return row,col
-    
+
 def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
     """
     Reads and plots the output from mintpy 
-    
+
     Parameters:
         h5file (str): path to h5 file
         key (str): key for certain dataset (e.g., coherence)
@@ -492,15 +507,15 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
         dataset=h5f[key][:]
     else:
         dataset=h5f[key][:][index,:,:]
-    
+
     #lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
     lons=[float(h5f.attrs['X_FIRST']),float(h5f.attrs['X_FIRST'])+dataset.shape[1]*float(h5f.attrs['X_STEP'])]
     #lats=[float(h5f.attrs['LAT_REF1']), float(h5f.attrs['LAT_REF2']),float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
     lats=[float(h5f.attrs['Y_FIRST'])+dataset.shape[0]*float(h5f.attrs['Y_STEP']),float(h5f.attrs['Y_FIRST'])]
-    
+
     lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
     #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
-    
+
     extent=[lonr1,lonr2,latr1,latr2]
     if np.mean(np.abs(extent))>180:
         utm=h5f.attrs['UTM_ZONE']
@@ -512,26 +527,26 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
         lons,lats=utm2ll(extent[0:2],extent[2::],z1,None,northern=northern)
         extent=[np.min(lons),np.max(lons),np.min(lats),np.max(lats)]
     h5f.close()
-    
+
     if aoi is not None:
         row1,col1=ll2rc(aoi.x1,aoi.y2,extent,dataset.shape)
         row2,col2=ll2rc(aoi.x2,aoi.y1,extent,dataset.shape)
         extent=[aoi.x1,aoi.x2,aoi.y1,aoi.y2]
         dataset=dataset[row1:row2,col1:col2]
-    
+
     vmin = np.nanpercentile(dataset, 1)
     vmax = np.nanpercentile(dataset, 99)
 
     ratio=(extent[1]-extent[0])/(extent[3]-extent[2])
-    
+
     fig, ax = plt.subplots()
 
     if ratio<0.3 or ratio>4:
         print('bad ratio')
         ax.set_aspect(1/ratio)
-        
+
     fig.suptitle(key, fontsize=16)
-    
+
     if 'coherence' in key.lower():
         cmap = matplotlib.cm.gist_gray.copy()
         cmap.set_bad('black')
@@ -548,7 +563,7 @@ def read_dataset_h5(h5file,key,index=None,plot=True,aoi=None):
         ax.set_xlabel('East (m)')
 
     plt.colorbar(im,orientation='horizontal')
-    #print(extent)
+
     return dataset
 
 def read_dataset_tif(tiffile,plot=True,aoi=None):
@@ -569,7 +584,7 @@ def read_dataset_tif(tiffile,plot=True,aoi=None):
         bounds = src.bounds
 
     #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
-    
+
     extent=[bounds.left,bounds.right,bounds.bottom,bounds.top]
 
     if aoi is not None:
@@ -577,12 +592,12 @@ def read_dataset_tif(tiffile,plot=True,aoi=None):
         row2,col2=ll2rc(aoi.x2,aoi.y1,extent,dataset.shape)
         extent=[aoi.x1,aoi.x2,aoi.y1,aoi.y2]
         dataset=dataset[row1:row2,col1:col2]
-    
+
     vmin = np.nanpercentile(dataset, 1)
     vmax = np.nanpercentile(dataset, 99)
-    
+
     fig, ax = plt.subplots()
-    
+
     if 'coh' in tiffile:
         fig.suptitle('Coherence', fontsize=16)
         cmap = matplotlib.cm.gist_gray.copy()
@@ -600,7 +615,7 @@ def read_dataset_tif(tiffile,plot=True,aoi=None):
         ax.set_ylabel('North (m)')
         ax.set_xlabel('East (m)')
     plt.colorbar(im,orientation='horizontal')
-    print(extent)
+
     return dataset
 
 def read_gnss_csv(csvfile,trans=False,ignore=[]):
@@ -626,9 +641,9 @@ def read_gnss_csv(csvfile,trans=False,ignore=[]):
     archivo=open(csvfile,'r')
     linesor=archivo.readlines()
     archivo.close()
-    
+
     lines=[line for line in linesor if not '%' in line]
-    
+
     names,lons,lats,uxs,uys,uzs,euxs,euys,euzs=[],[],[],[],[],[],[],[],[]
     for line in lines:
         if not line.split()[0] in ignore:
@@ -641,7 +656,7 @@ def read_gnss_csv(csvfile,trans=False,ignore=[]):
             euxs.append(float(line.split()[6]))
             euys.append(float(line.split()[7]))
             euzs.append(float(line.split()[8]))
-        
+
     lons=np.array(lons)
     lots=np.array(lats)
     uxs=np.array(uxs)
@@ -650,7 +665,7 @@ def read_gnss_csv(csvfile,trans=False,ignore=[]):
     euxs=np.array(euxs)
     euys=np.array(euys)
     euzs=np.array(euzs)
-    
+
     if trans:
         xs,ys,z1s,z2s=ll2utm(lons,lats)
         meanx=np.mean(xs)
@@ -688,9 +703,9 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
     archivo=open(csvfile,'r')
     linesor=archivo.readlines()
     archivo.close()
-    
+
     lines=[line for line in linesor if not '%' in line]
-    
+
     lons,lats,azs,lks,los,elos=[],[],[],[],[],[]
     for line in lines:
         lons.append(float(line.split()[0]))
@@ -705,7 +720,7 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
     lks=np.array(lks)
     los=np.array(los)
     elos=np.array(elos)
-    
+
     if linesor[0][0]=='%' and not 'None' in linesor[0]:
         ref=[float(linesor[0].split(':')[1].split(',')[0]),float(linesor[0].split(':')[1].split(',')[1])]
         posmin=np.argmin((lons-ref[0])**2+(lats-ref[1])**2)
@@ -731,7 +746,7 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     """
     Plots gnss dataset, horizontal velocities are represented by red arrows
     vertical velocities are represented by black lines
-    
+
     Parameters:
         xs/lons (array): x-coordinates or longitudes for the stations (m/deg)
         ys/lats (array): y-coordinates or latitudes for the stations (m/deg)
@@ -783,8 +798,8 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
         sposy=limsy[1]-ratio/10*(limsy[1]-limsy[0])
         sposy2=limsy[0]+ratio/10*(limsx[1]-limsx[0])-0.05*(limsy[1]-limsy[0])
     sposy1=sposy-0.05*(limsy[1]-limsy[0])
-    
-    
+
+
     if scl is None:
         scale=ratio*extent/hmax
         sc=hmax/2
@@ -817,21 +832,18 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
     else:
         plt.ylabel('Lat(°)')
         plt.xlabel('Lon(°)')
-    
+
     plt.xlim(limsx)
     plt.ylim(limsy)
     ax = plt.gca()
     ax.xaxis.set_major_locator(plt.MaxNLocator(4))
-    #plt.axis('square')
-    #plt.axis('equal')
-    #plt.axis('scaled')
     plt.show()
 
 def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, errx=None, erry=None, errz=None, arrowscale=0.01, ignore=[]):
     """
     Plots GNSS dataset with pygmt, horizontal velocities are represented by blue arrows
     vertical velocities are represented by red arrows
-    
+
     Parameters:
         csvfile (str): filename for the csv that contains the GNSS velocities
         uxs (array): deformation in the east component, if None it will plot data from the csv file
@@ -849,11 +861,10 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
         arrowscale (float): scale for the velocities in meters per year, default 1cm/yr
         ignore (array): names of the stations that will not be plotted
     """
-    
     import pygmt
     import xarray as xr
     import pandas as pd
-    
+
     names,lons,lats,uxsf,uysf,uzsf,euxs,euys,euzs=read_gnss_csv(csvfile,ignore=ignore)
 
     if uxs is None:
@@ -867,7 +878,7 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
             uxs=np.array([uxs[i] for i in range(len(uxs)) if namest[i] not in namesf])
             uys=np.array([uys[i] for i in range(len(uys)) if namest[i] not in namesf])
             uzs=np.array([uzs[i] for i in range(len(uzs)) if namest[i] not in namesf])
-            
+
     if erry is None:
         sxs=euxs
         sys=euys
@@ -881,24 +892,24 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
     interlat=np.round(np.abs(np.max(lats)-np.min(lats))*0.5,1)
     inter=np.max([interlon,interlat])
     region=[np.min(lons)-interlon,np.max(lons)+interlon,np.min(lats)-interlat,np.max(lats)+interlat]
-    
+
     stns=[[lons[i],lats[i]] for i in range(len(lons))]
-    
+
     lons=lons.tolist()+[region[0]+interlon/2]
     lats=lats.tolist()+[region[-1]-interlat]
     if arrowscale*1e2>=1:
         names=names+[str(int(arrowscale*1e2))+"cm/yr"]
     else:
         names=names+[str(float(arrowscale*1e2))+"cm/yr"]
-    
+
     uxs=np.array(uxs.tolist()+[arrowscale])
     uys=np.array(uys.tolist()+[0.000])
     uzs=np.array(uzs.tolist()+[arrowscale])
-    
+
     sxs=np.array(sxs.tolist()+[0.000])
     sys=np.array(sys.tolist()+[0.000])
     szs=np.array(szs.tolist()+[0.000])
-    
+
     df = pd.DataFrame(
         data={
             "x": lons,
@@ -909,7 +920,7 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
             "north_sigma": sys*0,
         }
     )
-    
+
     df1 = pd.DataFrame(
         data={
             "x": lons,
@@ -920,12 +931,12 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
             "north_sigma": szs*0,
         }
     )
-    
+
     grid_data = '@earth_relief_03s' 
     grid = pygmt.grdcut(grid_data,
                                  region=region,
                                 )
-    
+
     dgrid = pygmt.grdgradient(grid=grid,azimuth=270)
     grid.data[np.logical_and(grid>177,grid<180)]=np.nan
     fig = pygmt.Figure()
@@ -941,7 +952,7 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
         frame=['a'+str(inter),'+t'+str(title)]
     else:
         frame=['a'+str(inter)]
-    
+
     fig.grdimage(
         grid=grid,
         region=region,
@@ -952,12 +963,12 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
 
     lonll=np.round(region[0]+interlon/2,1)
     latll=np.round(region[2]+interlat/2,2)
-    
+
     fig.coast(shorelines="0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
-    
+
     fig.text(x=lons,y=np.array(lats)-float(inter/20),text=names,fill='white',font="30p,Helvetica,black")
-    
-    
+
+
     fig.velo(
         data=df,
         region=region,
@@ -967,7 +978,7 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
         spec="e"+str(0.25/(arrowscale*1e2))+"/0.39/10",
         vector="0.7c+p0.5p+e+gblue",
     )
-    
+
     fig.velo(
         data=df1,
         region=region,
@@ -991,15 +1002,15 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
                     raise Exception('The labels and points do not have the same size')
                 fig.text(x=points[i][0],y=points[i][1]-float(inter/20),text=lpoints[i],font="20p,Helvetica,black")
 
-    
-    
+
+
     fig.savefig(output)
     fig.show()
 
 def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
     """
     Plots InSAR dataset with pygmt
-    
+
     Parameters:
         csvfile (str): filename for the csv that contains the downsampled InSAR dataset
         data (array): LOS deformation data, if None it will plot the data from the csv file
@@ -1029,33 +1040,33 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
     else:
         dataset,extent=los2npy(data,csvfile,maskfile=maskfile)
     velocitycp=dataset
-    
+
     quad=open(csvfile,'r')
     lines=quad.readlines()
     quad.close()
-    
+
     region=list(extent)
-    
+
     ref=[float(lines[0].split(':')[1].split(',')[i]) for i in range(2)] 
     line=lines[0].split('Extent:')[1]
-    
+
     coords=[float(line.split(',')[i]) for i in range(len(line.split(',')))]
     for coord in coords:
         if np.abs(coord)>180:
             raise Exception('The dataset does not have lon/lat coordinates cannot use pygmt')
-    
+
     lons=np.linspace(coords[0],coords[1],velocitycp.shape[1])
     lats=np.linspace(coords[2],coords[3],velocitycp.shape[0])[::-1]
-    
+
     quadobsa1=np.copy(velocitycp)*1e2
-    
+
     box_x=[lons[0],lons[-1],lons[-1],lons[0],lons[0]]
     box_y=[lats[-1],lats[-1],lats[0],lats[0],lats[-1]]
-    
+
     data=xr.DataArray(data=quadobsa1,dims=['lat','lon'],coords={'lon':lons,'lat':lats})
-    
+
     grid_data = '@earth_relief_03s' 
-    
+
     grid=pygmt.datasets.load_earth_relief(resolution="03s", region=[lons[0],lons[-1],lats[-1],lats[0]])
     orgrid=np.copy(grid)
     dgrid = pygmt.grdgradient(grid=grid,azimuth=270)
@@ -1067,7 +1078,7 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
     pygmt.config(FONT_LABEL='30p,Helvetica,black')
     pygmt.config(FONT_TITLE='40p,Helvetica,black')
     pygmt.config(COLOR_FOREGROUND='lightgray')
-    
+
     pygmt.makecpt(cmap="gray", series=[-np.nanmax(grid.data), np.nanmax(grid.data)])
 
     interlon=np.round(np.abs(np.max(lons)-np.min(lons))/5,1)
@@ -1078,7 +1089,7 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
         frame=['a'+str(inter),'+t'+str(title)]
     else:
         frame=['a'+str(inter)]
-    
+
     fig.grdimage(
         grid=grid,
         region=region,
@@ -1088,9 +1099,9 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
     )
 
     max=np.nanmax(np.abs(dataset)*1e2)*0.8
-    
+
     pygmt.makecpt(cmap="jet", series=[-max, max])
-    
+
     fig.grdimage(
         grid=data,
         region=region,
@@ -1100,12 +1111,12 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
         nan_transparent=True,
     )
     fig.colorbar(frame="af+lLOS deformation (cm)")
-    
+
     pygmt.makecpt(cmap="jet", series=[-max, max])
 
     lonll=np.percentile(lons,20)
     latll=np.percentile(lats,20)
-    
+
     fig.coast(shorelines="0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
 
     if points is not None:
@@ -1120,8 +1131,7 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
                 if not len(lpoints)==len(points):
                     raise Exception('The labels and points do not have the same size')
                 fig.text(x=points[i][0],y=points[i][1]-float(inter/20),text=lpoints[i],font="20p,Helvetica,black")
-            
-    
+
     fig.savefig(output)
     fig.show()
 
@@ -1148,7 +1158,7 @@ def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
     archivo.close()
 
     dim=[int(lines[0].split('Dimensions:')[1].split(',')[i]) for i in range(2)]
-    
+
     result=open('temp.txt','w')
     result.write(lines[0])
     for i in range(len(lines)-1):
@@ -1159,20 +1169,20 @@ def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
 
         result.write(line)
     result.close()
-    
+
     if maskfile:
         mask_des=np.load(maskfile)
     else:
         mask_des=np.zeros((dim[0],dim[1]))
         mask_des=mask_des>0
-        
+
     qmap,extent,rcoords=get_defmap('temp.txt',mask=mask_des,trans=False,cref=cref)
 
     subprocess.call('rm -rf temp.txt',shell=True)
-    
+
     if output:
         np.save(output,qmap)
-    
+
     return qmap,extent
     
 class AOI_Selector:
@@ -1242,7 +1252,7 @@ class AOI_Selector:
                         velocity=h5f['velocity'][:]
                     except:
                         raise Exception('This dataset does not have LOS deformation')
-                        
+
             #lons=[float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']),float(h5f.attrs['LON_REF3']), float(h5f.attrs['LON_REF4'])]
             lons=[float(h5f.attrs['X_FIRST']),float(h5f.attrs['X_FIRST'])+velocity.shape[1]*float(h5f.attrs['X_STEP'])]
             #lats=[float(h5f.attrs['LAT_REF1']),float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3']), float(h5f.attrs['LAT_REF4'])]
@@ -1260,9 +1270,9 @@ class AOI_Selector:
                 lonr1,lonr2,latr1,latr2=np.min(lons),np.max(lons),np.min(lats),np.max(lats)
             #lonr1, lonr2, latr1, latr2 = float(h5f.attrs['LON_REF1']), float(h5f.attrs['LON_REF2']), float(h5f.attrs['LAT_REF2']), float(h5f.attrs['LAT_REF3'])
             #self.wl=float(h5f.attrs['WAVELENGTH'])
-            
+
             h5f.close()
-        
+
         elif '.tif' in filename:
             with rasterio.open(filename) as src:
                 # Read the raster data
@@ -1279,14 +1289,14 @@ class AOI_Selector:
                 raise Exception('You need to provide the wavelength of the SAR mission')
 
         velocity[velocity==0]=np.nan
-        
+
         if coh is not None:
             self.coh=coh
             self.cohth=cohth
             velocity[coh<cohth]=np.nan
-        
+
         print('Please select the area of interest')
-        
+
         self.image = velocity
         self.extent=[lonr1,lonr2,latr1,latr2]
         self.x1 = None
@@ -1306,7 +1316,7 @@ class AOI_Selector:
         else:
             self.fig, self.current_ax = plt.subplots()
         self.fig.suptitle('Area-Of-Interest Selector', fontsize=16)
-        
+
         self.cmap=plt.cm.jet
         im=self.current_ax.imshow(self.image, cmap=plt.cm.jet, extent=self.extent, vmin=self.vmin, vmax=self.vmax)
 
@@ -1346,7 +1356,7 @@ class AOI_Selector:
         self.x2, self.y2 = erelease.xdata, erelease.ydata
         print("(%3.2f, %3.2f) --> (%3.2f, %3.2f)" % (self.x1, self.y1, self.x2, self.y2))
         print(" The button you used were: %s %s" % (eclick.button, erelease.button))
-    
+
 class Ref_Insar_Selector_Pre:
     """
     Class to create an interactive tool to select a reference pixel from 
@@ -1363,7 +1373,7 @@ class Ref_Insar_Selector_Pre:
     def __init__(self,aoi):
         self.xref=None
         self.yref=None
-        
+
         velocity=aoi.image
         extent=aoi.extent
         lonr1,lonr2,latr1,latr2=extent
@@ -1375,7 +1385,7 @@ class Ref_Insar_Selector_Pre:
 
         lons=np.linspace(lonr1,lonr2,velocity.shape[1])
         lats=np.linspace(latr1,latr2,velocity.shape[0])[::-1]
-        
+
         if aoi.x1 is None:
             row1=0
             row2=velocity.shape[0]
@@ -1389,11 +1399,11 @@ class Ref_Insar_Selector_Pre:
 
         import ipywidgets as widgets
         out = widgets.Output()
-        
+
         self.dataset=np.copy(velocity[row1:row2,col1:col2])
         fig, ax = plt.subplots()
         fig.suptitle('Reference Selector', fontsize=16)
-        
+
         im=ax.imshow(self.dataset,cmap=aoi.cmap,extent=self.extent,vmin=aoi.vmin, vmax=aoi.vmax)
         line,=ax.plot([], [],'ko')
 
@@ -1405,21 +1415,21 @@ class Ref_Insar_Selector_Pre:
             ax.set_xlabel('East (m)')
 
         plt.colorbar(im,orientation='horizontal')
-        
+
         def on_click(event):
             """
             Captures the coordinates when a user click on the plot
             """
             row,col=ll2rc(event.xdata,event.ydata,self.extent,self.dataset.shape)
-            
+
             row,col=get_closest_point(row,col,self.dataset)
 
             #line.set_xdata(event.xdata)
             #line.set_ydata(event.ydata)
-            
+
             self.xref=event.xdata
             self.yref=event.ydata
-            
+
             self.dataset-=self.dataset[row,col]
             ax.clear()
             ax.imshow(self.dataset,cmap=aoi.cmap,extent=self.extent,vmin=aoi.vmin, vmax=aoi.vmax)
@@ -1436,7 +1446,7 @@ class Ref_Insar_Selector_Pre:
         #cid=fig.canvas.mpl_connect('button_press_event', on_click)
 
         plt.show()
-        
+
 class Ref_Insar_Selector:
     """
     Class to create an interactive tool to select a reference pixel from 

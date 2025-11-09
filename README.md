@@ -46,17 +46,18 @@ The inversions can include one or multiple data types in the inversion and the m
 We recommend using Anaconda or Miniconda to create an environment in which to install VMOD to prevent dependency conflicts.
 ```console
 conda env create --file=environment.yml
-```
-Then, activate the environment and install VMOD from PyPi.
-
-```console
 conda activate vmod
-pip install vmod-geodesy
+python -m jupyterlab
 ```
+Then run one of the notebooks.
 
 ## Run an inversion:
 
 In this repository we included several notebooks to show the steps necessary to run an inversion using [GNSS](dvd_gnss_low.ipynb), [InSAR](dvd_insar_high.ipynb), and [joint](unimak_joint.ipynb) datasets. We also included an example for an InSAR dataset on [Unimak Island](unimak_insar.ipynb).
+
+## Stress calculations:
+
+VMOD allows to calculate Coulomb stress changes for forward models in the notebook [Coulomb stress changes](CFS.ipynb)
 
 ## Add new datatype:
 

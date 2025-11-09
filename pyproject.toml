@@ -33,7 +33,8 @@ dependencies = [
     "emcee == 3.*",
     "tqdm",
     "ipympl",
-    "pygmt"
+    "pygmt",
+    "hankel"
 ]
 
 [project.urls]
