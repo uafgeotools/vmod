@@ -48,6 +48,7 @@ class Vsphere(Source):
         print("\td = %f" % x[2])
         print("\tradius = %f" % x[3])
         print("\tdP= %f" % x[4])
+        print("\ttau= %f" % x[5])
     
     def set_parnames(self):
         """
@@ -55,7 +56,7 @@ class Vsphere(Source):
         """
         self.parameters=("xcen","ycen","depth","radius","dP","tau")
         
-    def model(self, x, y, xcen, ycen, d, rad, dP):
+    def model(self, x, y, xcen, ycen, d, rad, dP, tau):
         """
         Initial 3d displacement field on surface for pressurized sphere in a viscoelastic medium (Bonafede and Ferrari, 2009)
 
@@ -73,7 +74,7 @@ class Vsphere(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
-        return model_t(x,y,0, xcen, ycen, d, rad, dP)
+        return model_t(x,y,0, xcen, ycen, d, rad, dP, tau)
         
     def model_t(self, x, y, t, xcen, ycen, d, rad, dP, tau, nu=0.25, mu=1):
         """
