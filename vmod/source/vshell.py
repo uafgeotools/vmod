@@ -55,9 +55,9 @@ class Vshell(Source):
         """
         Function defining the names for the parameters in the model.
         """
-        self.parameters=("xcen","ycen","depth","radius","dP","tau")
+        self.parameters=("xcen","ycen","depth","radius1","radius2","dP","tau")
         
-    def model(self, x, y, xcen, ycen, d, rad, dP):
+    def model(self, x, y, xcen, ycen, d, rad1, rad2, dP, tau):
         """
         Initial 3d displacement field on surface for viscoelastic shell (Segall, 2010)
 
@@ -67,7 +67,8 @@ class Vshell(Source):
             xcen: x-offset of point source epicenter (m)
             ycen: y-offset of point source epicenter (m)
             d: depth to point (m)
-            rad: chamber radius (m)
+            rad1: internal radius (m)
+            rad2: external radius (m)
             dP: change in pressure (Pa)
             
         Returns:
@@ -75,7 +76,7 @@ class Vshell(Source):
             uy (array) : displacements in north in meters.
             uz (array) : displacements in vertical in meters.
         """
-        return model_t(x,y,0, xcen, ycen, d, rad, dP)
+        return model_t(x,y,0, xcen, ycen, d, rad1, rad2, dP, tau)
         
     def model_t(self, x, y, t, xcen, ycen, d, rad1, rad2, dP, tau, nu=0.25, mu=1):
         """
@@ -88,7 +89,8 @@ class Vshell(Source):
             xcen: x-offset of point source epicenter (m)
             ycen: y-offset of point source epicenter (m)
             d: depth to point (m)
-            rad: chamber radius (m)
+            rad1: internal radius (m)
+            rad2: external radius (m)
             dP: change in pressure (in terms of mu if mu=1 if not unit is Pa)
             nu: poisson's ratio for medium (default 0.25)
             mu: shear modulus for medium (Pa) (default 1)
