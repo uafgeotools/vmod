@@ -154,7 +154,7 @@ class Yang(Source):
 
         return U1,U2,U3
     
-    def model_depth(self,x,y,z,xce,ycen,z0,P,a,b,phi,theta,nu=0.25,mu=1):
+    def model_depth(self,x,y,z,xcen,ycen,z0,P,a,b,phi,theta,nu=0.25,mu=1):
         """
         Computes deformation at depth due to a prolate spheroid pressurized chamber in elastic half-space
         Yang et al., vol 93, JGR, 4249-4257, 1988)     
