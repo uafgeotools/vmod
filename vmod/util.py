@@ -658,7 +658,7 @@ def read_gnss_csv(csvfile,trans=False,ignore=[]):
             euzs.append(float(line.split()[8]))
 
     lons=np.array(lons)
-    lots=np.array(lats)
+    lats=np.array(lats)
     uxs=np.array(uxs)
     uys=np.array(uys)
     uzs=np.array(uzs)
