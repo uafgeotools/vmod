@@ -914,7 +914,7 @@ class Inverse:
 
         return self.nlsq()
 
-    def corner_plot(self, traces):
+    def corner_plot(self, traces, output = 'histograms'):
         """
         Create corner plot from traces
         
@@ -935,4 +935,4 @@ class Inverse:
         figure = corner.corner(newdata.T, labels=newlabels,max_n_ticks=3,smooth=0.7,labelpad=0.3,
                            quantiles=[0.16, 0.5, 0.84],
                            show_titles=False, title_kwargs={"fontsize": 30})
-        plt.savefig('histograms', bbox_inches='tight')
+        plt.savefig(output, bbox_inches='tight')
