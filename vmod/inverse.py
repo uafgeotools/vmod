@@ -1,4 +1,5 @@
 import copy
+import corner
 import os
 import pickle
 import random
@@ -819,3 +820,119 @@ class Inverse:
         for s in self.sources:
             s.print_model(self.model.x[param_cnt:param_cnt+s.get_num_params()])
             param_cnt += s.get_num_params()
+
+    def convert_labels_units(self, labels):
+        """
+        Convert labels and units to make plot more readible
+        
+        Parameters:
+            labels (array): input labels from source object 
+
+        Returns:
+            newlabels (array): new labels with units
+            orders (array): new orders to make plots more readible
+        """
+        newlabels = []
+        orders = []
+        multi = False
+        for label in labels:
+            if any(char.isdigit() for char in label):
+                multi = True
+            if 'cen' in label or ((label[0]=='a' or label[0]=='b') and len(label)<3) or 'depth' in label or 'length' in label or 'width' in label or 'radius' in label:
+                if multi:
+                    newlabels.append(f"${label[0].upper()}_{label[-1]}(km)$")
+                else:
+                    newlabels.append(f"${label[0].upper()}(km)$")
+                orders.append(1e3)
+            elif 'pressure' in label or 'dP' in label:
+                if multi:
+                    name = f"$P_{label[-1]}(m\mu)$"
+                    newlabels.append(r''+name)
+                else:
+                    newlabels.append(r'$P(m\mu)$')
+                orders.append(1e-3)
+            elif 'az' in label:
+                if multi:
+                    name = f"$\phi_{label[-1]}(^{{\circ}})$"
+                    newlabels.append(r''+name)
+                else:
+                    newlabels.append(r'$\phi(^{{\circ}})$')
+                orders.append(1)
+            elif 'dip' in label:
+                if multi:
+                    name = f"$\\theta_{label[-1]}(^{{\circ}})$"
+                    newlabels.append(r''+name)
+                else:
+                    newlabels.append(r'$\\theta(^{{\circ}})$')
+                orders.append(1)
+            else:
+                newlabels.append(label)
+                orders.append(1)
+        return newlabels, orders
+
+    def get_samples(self, traces):
+        """
+        Get samples from trace list
+        
+        Parameters:
+            traces (array): list of traces for the different parameters
+
+        Returns:
+            data (array): 2-d array with sample values
+            labels (array): parameter labels for each row in the data array
+        """
+        data=[]
+        labels=[]
+        parnames,orders = self.get_parnames_orders()
+        for i, tr in enumerate(traces):
+            data.append(tr[:])
+            labels.append(parnames[i])
+        data=np.vstack(data)
+
+        return data, labels
+
+    def get_map_solution(self, traces):
+        """
+        Get maximum apriori solution from Bayesian inversion
+        
+        Parameters:
+            traces (array): list of traces for the different parameters
+
+        Returns:
+            params (array): list of parameters that represent the MAP solution
+        """
+        data, labels = self.get_samples(traces)
+        bl=np.array([np.percentile(data[i,:],5) for i in range(data.shape[0])])
+        bh=np.array([np.percentile(data[i,:],95) for i in range(data.shape[0])])
+
+        start = 0
+        for source in self.sources:
+            low_bounds = bl[start: start + len(source.low_bounds)]
+            high_bounds = bh[start: start + len(source.high_bounds)]
+            source.set_bounds(low_bounds, high_bounds)
+            start += len(source.low_bounds)
+
+        return self.nlsq()
+
+    def corner_plot(self, traces):
+        """
+        Create corner plot from traces
+        
+        Parameters:
+            traces (array): output from Bayesian inversion
+        """
+        import matplotlib.pyplot as plt
+        import corner
+
+        data, labels = self.get_samples(traces)
+        newdata=np.copy(data)
+
+        newlabels, neworders = self.convert_labels_units(labels)
+        for i in range(newdata.shape[0]):
+            newdata[i,:] = newdata[i,:]/neworders[i]
+        plt.rcParams.update({'font.size': 30})
+
+        figure = corner.corner(newdata.T, labels=newlabels,max_n_ticks=3,smooth=0.7,labelpad=0.3,
+                           quantiles=[0.16, 0.5, 0.84],
+                           show_titles=False, title_kwargs={"fontsize": 30})
+        plt.savefig('histograms', bbox_inches='tight')

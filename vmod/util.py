@@ -742,6 +742,8 @@ def read_insar_csv(csvfile,trans=False,unit='m',ori=None,cref=True):
     else:
         return lons,lats,azs,lks,los,elos,ref
 
+
+
 def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=None,scl=None,unit='m',figsize=None):
     """
     Plots gnss dataset, horizontal velocities are represented by red arrows
@@ -841,8 +843,7 @@ def plot_gnss(xs,ys,uxs,uys,uzs,title=None,names=None,euxs=None,euys=None,euzs=N
 
 def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, errx=None, erry=None, errz=None, arrowscale=0.01, ignore=[]):
     """
-    Plots GNSS dataset with pygmt, horizontal velocities are represented by blue arrows
-    vertical velocities are represented by red arrows
+    Plots GNSS dataset with pygmt from csv file
 
     Parameters:
         csvfile (str): filename for the csv that contains the GNSS velocities
@@ -855,16 +856,12 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
         points (array): coordinate points, if None no points will be plotted
         epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
         lpoints (array): labels for 'points', if None no labels will be plotted
-        errx (array): uncertainties in the deformation in the north component
+        errx (array): uncertainties in the deformation in the east component
         erry (array): uncertainties in the deformation in the north component
         errz (array): uncertainties in the deformation in the vertical component
         arrowscale (float): scale for the velocities in meters per year, default 1cm/yr
         ignore (array): names of the stations that will not be plotted
     """
-    import pygmt
-    import xarray as xr
-    import pandas as pd
-
     names,lons,lats,uxsf,uysf,uzsf,euxs,euys,euzs=read_gnss_csv(csvfile,ignore=ignore)
 
     if uxs is None:
@@ -887,6 +884,38 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
         sxs=errx
         sys=erry
         szs=errz
+
+    fig = plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar, output, title, points, epoints, lpoints, arrowscale, ignore)
+
+    fig.show()
+
+def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, arrowscale=0.01, ignore=[]):
+    """
+    Plots GNSS dataset with pygmt, horizontal velocities are represented by blue arrows
+    vertical velocities are represented by red arrows
+
+    Parameters:
+        names (array): list of station names
+        lons (array): list of station longitude coordinates
+        lats (array): list of station latitude coordinates
+        uxs (array): deformation in the east component, if None it will plot data from the csv file
+        uys (array): deformation in the north component
+        uzs (array): deformation in the vertical component
+        sxs (array): uncertainties in the deformation in the east component
+        sys (array): uncertainties in the deformation in the north component
+        szs (array): uncertainties in the deformation in the vertical component
+        scalebar (int): scalebar for the map in kilometers
+        output (str): filename for the output figure
+        title (str): title on the figure
+        points (array): coordinate points, if None no points will be plotted
+        epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
+        lpoints (array): labels for 'points', if None no labels will be plotted
+        arrowscale (float): scale for the velocities in meters per year, default 1cm/yr
+        ignore (array): names of the stations that will not be plotted
+    """
+    import pygmt
+    import xarray as xr
+    import pandas as pd
 
     interlon=np.round(np.abs(np.max(lons)-np.min(lons))*0.5,1)
     interlat=np.round(np.abs(np.max(lats)-np.min(lats))*0.5,1)
@@ -1005,11 +1034,12 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
 
 
     fig.savefig(output)
-    fig.show()
 
+    return fig
+    
 def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
     """
-    Plots InSAR dataset with pygmt
+    Plots InSAR dataset with pygmt from csv file
 
     Parameters:
         csvfile (str): filename for the csv that contains the downsampled InSAR dataset
@@ -1022,9 +1052,6 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
         epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
         lpoints (array): labels for 'points', if None no labels will be plotted
     """
-    import pygmt
-    import xarray as xr
-
     if data is None:
         archivo=open(quadfile,'r')
         lines=archivo.readlines()
@@ -1039,18 +1066,55 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
         dataset,extent,rcoords=get_defmap(csvfile,mask=maskfile,trans=False,cref=False)
     else:
         dataset,extent=los2npy(data,csvfile,maskfile=maskfile)
-    velocitycp=dataset
 
     quad=open(csvfile,'r')
     lines=quad.readlines()
     quad.close()
 
-    region=list(extent)
-
-    ref=[float(lines[0].split(':')[1].split(',')[i]) for i in range(2)] 
     line=lines[0].split('Extent:')[1]
 
     coords=[float(line.split(',')[i]) for i in range(len(line.split(',')))]
+
+    fig = plot_insar(dataset, extent, scalebar, output, title, points, epoints, lpoints)
+
+    fig.show()
+
+def plot_insar_data(data, mask, boxes, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+    """
+    Plots InSAR dataset with pygmt
+
+    Parameters:
+        data (array): downsampled LOS deformation data
+        mask (array): 2d-array with the mask
+        extent (array): list with the extent coordinates in lon/lat format
+        scalebar (int): scalebar for the map in kilometers
+        output (str): filename for the output figure
+        title (str): title on the figure
+        points (array): coordinate points, if None no points will be plotted
+        epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
+        lpoints (array): labels for 'points', if None no labels will be plotted
+    """
+    rows = np.max([box[1] for box in boxes]) + 1
+    cols = np.max([box[3] for box in boxes]) + 1
+    dim = (rows, cols)
+
+    dataset = np.ones(dim)*np.nan
+    for i, box in enumerate(boxes):
+        dataset[box[0]:box[1],box[2]:box[3]] = data[i]
+    dataset[mask] = np.nan
+
+    fig = plot_insar(dataset, extent, scalebar, output, title, points, epoints, lpoints)
+
+    return fig
+
+def plot_insar(dataset, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+    import pygmt
+    import xarray as xr
+
+    region=list(extent)
+    velocitycp=dataset
+
+    coords=extent
     for coord in coords:
         if np.abs(coord)>180:
             raise Exception('The dataset does not have lon/lat coordinates cannot use pygmt')
@@ -1133,9 +1197,8 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
                 fig.text(x=points[i][0],y=points[i][1]-float(inter/20),text=lpoints[i],font="20p,Helvetica,black")
 
     fig.savefig(output)
-    fig.show()
-
-
+    return fig
+    
 def los2npy(los,quadfile,maskfile=None,output=None,cref=False):
     """
     Creates matrix representing downsampled InSAR dataset replacing los deformation
