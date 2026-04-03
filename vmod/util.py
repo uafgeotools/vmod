@@ -1094,11 +1094,7 @@ def plot_insar_data(data, mask, boxes, extent, scalebar=10, output='figure_pygmt
         epoints (array): error bars in degrees for 'points'. It needs to have the same size of 'points', if None no error bars will be plotted
         lpoints (array): labels for 'points', if None no labels will be plotted
     """
-    rows = np.max([box[1] for box in boxes]) + 1
-    cols = np.max([box[3] for box in boxes]) + 1
-    dim = (rows, cols)
-
-    dataset = np.ones(dim)*np.nan
+    dataset = np.full(mask.shape, np.nan)
     for i, box in enumerate(boxes):
         dataset[box[0]:box[1],box[2]:box[3]] = data[i]
     dataset[mask] = np.nan
