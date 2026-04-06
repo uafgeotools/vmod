@@ -889,7 +889,7 @@ def plot_gnss_pygmt(csvfile, uxs=None, uys=None, uzs=None, scalebar=10, output='
 
     fig.show()
 
-def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, arrowscale=0.01, ignore=[]):
+def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, arrowscale=None, ignore=[], fontsize=None):
     """
     Plots GNSS dataset with pygmt, horizontal velocities are represented by blue arrows
     vertical velocities are represented by red arrows
@@ -926,11 +926,16 @@ def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10,
 
     lons=lons.tolist()+[region[0]+interlon/2]
     lats=lats.tolist()+[region[-1]-interlat]
+    if arrowscale is None:
+        hvel=np.max(np.sqrt((uxs**2+uys**2)))
+        vvel=np.max(uzs)
+        arrowscale=float(f"{np.max([hvel,vvel]):.1g}")
+        if arrowscale < 0.001:
+            arrowscale = 0.01
     if arrowscale*1e2>=1:
-        names=names+[str(int(arrowscale*1e2))+"cm/yr"]
+        names=list(names)+[str(int(arrowscale*1e2))+"cm/yr"]
     else:
-        names=names+[str(float(arrowscale*1e2))+"cm/yr"]
-
+        names=list(names)+[str(float(arrowscale*1e2))+"cm/yr"]
     uxs=np.array(uxs.tolist()+[arrowscale])
     uys=np.array(uys.tolist()+[0.000])
     uzs=np.array(uzs.tolist()+[arrowscale])
@@ -971,9 +976,14 @@ def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10,
     fig = pygmt.Figure()
     pygmt.config(FORMAT_GEO_MAP='D')  # Use decimal degrees
     pygmt.config(MAP_FRAME_TYPE='plain')  # Use decimal degrees
-    pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
-    pygmt.config(FONT_LABEL='30p,Helvetica,black')
-    pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    if fontsize is None:
+        pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
+        pygmt.config(FONT_LABEL='30p,Helvetica,black')
+        pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    else:
+        pygmt.config(FONT_ANNOT_PRIMARY=f'{fontsize}p,Helvetica,black')
+        pygmt.config(FONT_LABEL=f'{fontsize}p,Helvetica,black')
+        pygmt.config(FONT_TITLE=f'{fontsize}p,Helvetica,black')
     pygmt.config(COLOR_FOREGROUND='lightgray')
     pygmt.makecpt(cmap="gray", series=[-np.nanmax(grid.data), np.nanmax(grid.data)])
 
@@ -995,7 +1005,10 @@ def plot_gnss_data(names, lons, lats, uxs, uys, uzs, sxs, sys, szs, scalebar=10,
 
     fig.coast(shorelines="0.5p,black",lakes='+l',map_scale=str(lonll)+'/'+str(latll)+'/'+str(latll)+'/'+str(scalebar),water="white")
 
-    fig.text(x=lons,y=np.array(lats)-float(inter/20),text=names,fill='white',font="30p,Helvetica,black")
+    if fontsize is None:
+        fig.text(x=lons,y=np.array(lats)-float(inter/20),text=names,fill='white',font="30p,Helvetica,black")
+    else:
+        fig.text(x=lons,y=np.array(lats)-float(inter/20),text=names,fill='white',font=f'{fontsize}p,Helvetica,black')
 
 
     fig.velo(
@@ -1079,7 +1092,7 @@ def plot_insar_pygmt(csvfile, data=None, maskfile=None, scalebar=10, output='fig
 
     fig.show()
 
-def plot_insar_data(data, mask, boxes, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+def plot_insar_data(data, mask, boxes, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, fontsize=None):
     """
     Plots InSAR dataset with pygmt
 
@@ -1099,11 +1112,11 @@ def plot_insar_data(data, mask, boxes, extent, scalebar=10, output='figure_pygmt
         dataset[box[0]:box[1],box[2]:box[3]] = data[i]
     dataset[mask] = np.nan
 
-    fig = plot_insar(dataset, extent, scalebar, output, title, points, epoints, lpoints)
+    fig = plot_insar(dataset, extent, scalebar, output, title, points, epoints, lpoints, fontsize)
 
     return fig
 
-def plot_insar(dataset, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None):
+def plot_insar(dataset, extent, scalebar=10, output='figure_pygmt.png', title=None, points=None, epoints=None, lpoints=None, fontsize=None):
     import pygmt
     import xarray as xr
 
@@ -1134,9 +1147,14 @@ def plot_insar(dataset, extent, scalebar=10, output='figure_pygmt.png', title=No
     fig = pygmt.Figure()
     pygmt.config(FORMAT_GEO_MAP='D')  # Use decimal degrees
     pygmt.config(MAP_FRAME_TYPE='plain')  # Use decimal degrees
-    pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
-    pygmt.config(FONT_LABEL='30p,Helvetica,black')
-    pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    if fontsize is None:
+        pygmt.config(FONT_ANNOT_PRIMARY='30p,Helvetica,black')
+        pygmt.config(FONT_LABEL='30p,Helvetica,black')
+        pygmt.config(FONT_TITLE='40p,Helvetica,black')
+    else:
+        pygmt.config(FONT_ANNOT_PRIMARY=f'{fontsize}p,Helvetica,black')
+        pygmt.config(FONT_LABEL=f'{fontsize}p,Helvetica,black')
+        pygmt.config(FONT_TITLE=f'{fontsize}p,Helvetica,black')
     pygmt.config(COLOR_FOREGROUND='lightgray')
 
     pygmt.makecpt(cmap="gray", series=[-np.nanmax(grid.data), np.nanmax(grid.data)])
