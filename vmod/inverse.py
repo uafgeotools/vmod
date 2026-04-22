@@ -853,17 +853,17 @@ class Inverse:
                 orders.append(1e-3)
             elif 'az' in label:
                 if multi:
-                    name = f"$\phi_{label[-1]}(^{{\circ}})$"
+                    name = f"$\phi_{label[-1]}(^{\circ})$"
                     newlabels.append(r''+name)
                 else:
-                    newlabels.append(r'$\phi(^{{\circ}})$')
+                    newlabels.append(r'$\phi(^{\circ})$')
                 orders.append(1)
             elif 'dip' in label:
                 if multi:
-                    name = f"$\\theta_{label[-1]}(^{{\circ}})$"
+                    name = f"$\\theta_{label[-1]}(^{\circ})$"
                     newlabels.append(r''+name)
                 else:
-                    newlabels.append(r'$\\theta(^{{\circ}})$')
+                    newlabels.append(r'$\theta(^{\circ})$')
                 orders.append(1)
             else:
                 newlabels.append(label)
